@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hangar — caças da Segunda Guerra</title>
+  <meta name="description" content="Arquivo técnico de caças da Segunda Guerra: 8 nações, famílias e variantes, fichas completas, comparador, linha do tempo e o lado elétrico de cada avião.">
+  <meta name="theme-color" content="#0b0c0d">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230b0c0d'/%3E%3Cpath d='M3 18 L9 18 L11 9 L14 25 L17 12 L19 18 L29 18' fill='none' stroke='%23ffa31a' stroke-width='2.4' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="trancado">
+
+<!-- ============ PORTÃO: o navegador precisa de um clique pra liberar o som ============ -->
+<div class="portao grade-fundo" id="portao">
+  <div class="portao-centro">
+    <p class="mono ambar">Arquivo técnico · caças 1939–1945</p>
+    <h1 class="portao-titulo">HANGAR</h1>
+    <p class="portao-sub" id="portao-sub">Fichas completas, famílias e variantes, e o lado elétrico de cada avião.</p>
+    <div class="chaves">
+      <button class="chave chave-principal" id="ligar-som" disabled>
+        <span class="alavanca" aria-hidden="true"></span>
+        <span class="chave-txt"><b>Chave geral</b><small>Ligar com som</small></span>
+      </button>
+      <button class="chave" id="ligar-mudo" disabled>
+        <span class="alavanca" aria-hidden="true"></span>
+        <span class="chave-txt"><b>Ligar sem som</b><small>Só visual</small></span>
+      </button>
+    </div>
+    <button class="link-mono" id="pular-abertura">Pular abertura →</button>
+  </div>
+  <div class="portao-rodape mono">
+    <span id="carregando">Carregando…</span>
+    <span>Trilha de fundo original · liga e desliga no topo</span>
+  </div>
+</div>
+
+<!-- ============ ABERTURA: partida elétrica do P-39Q-1 ============ -->
+<div class="abertura" id="abertura" hidden>
+  <div class="ab-foto" id="ab-foto"></div>
+  <div class="ab-caixa" id="ab-caixa">
+    <p class="mono mudo" style="margin:0">Bell P-39Q-1 Airacobra · sequência de partida</p>
+    <div class="ab-painel mono" id="ab-painel"></div>
+    <canvas class="ab-osc" id="ab-osc" aria-hidden="true"></canvas>
+    <div class="ab-leitura mono">
+      <span>Rotação <b id="ab-rpm">0</b> rpm</span>
+      <span>Ignição <b id="ab-hz">0</b> pulsos/s</span>
+    </div>
+  </div>
+  <button class="ab-pular mono" id="ab-pular">Pular (Esc)</button>
+</div>
+
+<!-- ============ TOPO ============ -->
+<header class="topo">
+  <a class="logo" href="#inicio">HANGAR<span>.</span></a>
+  <nav aria-label="Seções">
+    <a href="#hangar">Hangar</a>
+    <a href="#comparar">Comparar</a>
+    <a href="#linha">Linha do tempo</a>
+    <a href="#bancada">Bancada</a>
+    <a href="#projetos">Projetos</a>
+    <a href="#sobre">Sobre</a>
+  </nav>
+  <button class="som-btn" id="som-btn" aria-pressed="false" aria-label="Ligar a trilha de fundo">
+    <canvas id="som-viz" width="44" height="16" aria-hidden="true"></canvas>
+    <span id="som-txt">Som off</span>
+  </button>
+</header>
+
+<main>
+  <!-- INÍCIO -->
+  <section class="hero" id="inicio">
+    <div class="hero-foto" id="hero-foto"></div>
+    <div class="hero-conteudo">
+      <p class="mono ambar">Arquivo técnico · 1939–1945</p>
+      <h1>Caças da Segunda Guerra, peça por peça.</h1>
+      <p class="hero-texto">Escolha a nação, abra a família e vá de variante em variante. Cada avião tem ficha técnica completa e o lado elétrico: ignição, rádio, mira e o que mais tinha fio.</p>
+      <div class="numeros" id="numeros"></div>
+      <div class="hero-acoes">
+        <a class="btn btn-ambar" href="#hangar">Abrir o hangar</a>
+        <button class="btn" id="abrir-destaque">Ficha do P-39 Airacobra</button>
+      </div>
+    </div>
+    <p class="hero-legenda mono" id="hero-legenda"></p>
+  </section>
+
+  <!-- HANGAR -->
+  <section class="secao" id="hangar">
+    <header class="secao-topo">
+      <p class="mono ambar">01 · Hangar</p>
+      <h2>Escolha a nação</h2>
+      <p>Cada nação mostra os caças que projetou e também os que usou. Os finlandeses, por exemplo, voaram Brewster, Fiat, Morane e Messerschmitt.</p>
+    </header>
+    <div class="nacoes" id="nacoes" role="group" aria-label="Nações"></div>
+    <div class="filtros">
+      <div class="campo"><label for="f-motor">Motor</label>
+        <select id="f-motor">
+          <option value="">Todos</option>
+          <option value="linha">Em linha / V</option>
+          <option value="radial">Radial</option>
+          <option value="jato">A jato</option>
+        </select>
+      </div>
+      <div class="campo"><label for="f-papel">Papel</label><select id="f-papel"><option value="">Todos</option></select></div>
+      <div class="campo"><label for="f-ordem">Ordem</label>
+        <select id="f-ordem">
+          <option value="voo">1º voo</option>
+          <option value="vel">Velocidade</option>
+          <option value="prod">Produção</option>
+          <option value="nome">Nome</option>
+        </select>
+      </div>
+      <div class="campo"><label for="f-busca">Buscar</label><input id="f-busca" type="search" placeholder="Corsair, Yak, DB 605…"></div>
+    </div>
+    <p class="mono contagem" id="contagem"></p>
+    <div class="grade" id="grade"></div>
+  </section>
+
+  <!-- COMPARADOR -->
+  <section class="secao" id="comparar">
+    <header class="secao-topo">
+      <p class="mono ambar">02 · Comparador</p>
+      <h2>Lado a lado</h2>
+      <p>Escolha até três caças. Os números são da variante principal de cada família, e o melhor de cada linha fica em âmbar.</p>
+    </header>
+    <div class="comp-escolha" id="comp-escolha"></div>
+    <div class="comp-tabela" id="comp"></div>
+  </section>
+
+  <!-- LINHA DO TEMPO -->
+  <section class="secao" id="linha">
+    <header class="secao-topo">
+      <p class="mono ambar">03 · Linha do tempo</p>
+      <h2>Primeiro voo de cada família</h2>
+      <p>De 1933 a 1943, por nação. A faixa clara marca a guerra na Europa a partir de setembro de 1939.</p>
+    </header>
+    <div class="tempo-wrap"><div class="tempo" id="tempo"></div></div>
+  </section>
+
+  <!-- BANCADA -->
+  <section class="secao grade-fundo" id="bancada">
+    <header class="secao-topo">
+      <p class="mono ambar">04 · Bancada</p>
+      <h2>A ignição no osciloscópio</h2>
+      <p>Todo motor a pistão desses caças é um gerador de pulsos. Escolha o tipo de motor e a rotação pra ver a frequência das faíscas.</p>
+    </header>
+    <div class="bancada-grid">
+      <div>
+        <div class="osc">
+          <div class="osc-topo"><span>CH1 · ignição</span><span>2 ms/div</span></div>
+          <canvas id="lab-osc" aria-label="Forma de onda das faíscas de ignição"></canvas>
+          <div class="osc-base"><span id="lab-desc"></span><span><b id="lab-hz-top"></b></span></div>
+        </div>
+        <div class="controles">
+          <div class="campo"><label for="lab-motor">Motor</label>
+            <select id="lab-motor">
+              <option value="9">Radial 9 cilindros (I-16, Buffalo)</option>
+              <option value="12" selected>V12 (Allison, Merlin, DB 605)</option>
+              <option value="14">Radial 14 cilindros (BMW 801, Sakae)</option>
+              <option value="18">Radial 18 cilindros (R-2800, Homare)</option>
+              <option value="24">H-24 (Napier Sabre)</option>
+            </select>
+          </div>
+          <label class="mono mudo" for="lab-rpm">Rotação: <b class="ambar" id="lab-rpm-txt">3.000 rpm</b></label>
+          <input id="lab-rpm" type="range" min="600" max="4000" step="50" value="3000">
+          <div class="leituras">
+            <div><span>Faíscas por segundo</span><b id="lab-hz">300</b></div>
+            <div><span>Intervalo entre faíscas</span><b id="lab-ms">3,3 ms</b></div>
+            <div><span>Velas no motor</span><b id="lab-velas">24</b></div>
+          </div>
+        </div>
+      </div>
+      <div class="texto-bancada">
+        <p>Num motor de quatro tempos, cada cilindro faz uma explosão a cada duas voltas do virabrequim. Então a frequência das faíscas é <b class="ambar">cilindros × rpm ÷ 120</b>. Um V12 a 3.000 rpm dispara 300 vezes por segundo, como uma onda de 300 Hz.</p>
+        <h3>Por que dois magnetos?</h3>
+        <p>Os motores de avião têm ignição dupla: dois magnetos independentes, cada um alimentando uma vela em cada cilindro. Se um falhar, o motor continua. E queimar a mistura dos dois lados ao mesmo tempo deixa a combustão mais rápida e completa.</p>
+        <h3>Magneto não precisa de bateria</h3>
+        <p>O magneto é um gerador: um ímã girando perto de uma bobina induz a corrente, e um transformador eleva a tensão pra dezenas de milhares de volts na vela. O motor continua funcionando mesmo com o sistema elétrico do avião desligado.</p>
+        <h3>E o ruído no rádio?</h3>
+        <p>Cada faísca é um pulso de interferência eletromagnética. Sem cabos de vela blindados, o rádio chiava junto com o motor, e foi assim que muitos pilotos japoneses e soviéticos acabaram voando sem rádio.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- PROJETOS -->
+  <section class="secao" id="projetos">
+    <header class="secao-topo">
+      <p class="mono ambar">05 · Projetos</p>
+      <h2>Na prancheta</h2>
+      <p>Aeromodelos que eu quero construir.</p>
+    </header>
+    <div class="projetos" id="projetos-grid"></div>
+  </section>
+
+  <!-- SOBRE -->
+  <section class="secao" id="sobre">
+    <header class="secao-topo">
+      <p class="mono ambar">06 · Sobre</p>
+      <h2>Por que este hangar</h2>
+    </header>
+    <div class="sobre-grid">
+      <div>
+        <p>Sou entusiasta da aviação de caça da Segunda Guerra: os motores, o armamento, as variantes e a engenharia por trás de cada uma. Montei este arquivo pra juntar num lugar só o que eu gosto de pesquisar, com um olhar de engenharia elétrica sobre a ignição, o rádio, o radar e as miras.</p>
+        <p class="mudo">As fichas técnicas vêm das tabelas de especificações da Wikipedia, convertidas para unidades métricas. Valores com ≈ são aproximados. As fotos são do Wikimedia Commons, com autor e licença listados abaixo.</p>
+      </div>
+      <details class="creditos">
+        <summary>Créditos das fotos</summary>
+        <ol id="creditos-lista"></ol>
+      </details>
+    </div>
+  </section>
+</main>
+
+<footer class="rodape mono">
+  <span>Hangar · arquivo técnico de caças 1939–1945</span>
+  <span>Fichas: Wikipedia · Fotos: Wikimedia Commons</span>
+</footer>
+
+<!-- ============ FICHA DA FAMÍLIA ============ -->
+<div class="ficha" id="ficha" hidden role="dialog" aria-modal="true" aria-labelledby="ficha-nome">
+  <div class="ficha-barra">
+    <button class="btn btn-pequeno" id="ficha-voltar">← Hangar</button>
+    <span class="ref mono" id="ficha-ref"></span>
+    <button class="btn btn-pequeno" id="ficha-comparar">+ Comparar</button>
+    <button class="btn btn-pequeno" id="ficha-fechar" aria-label="Fechar ficha">✕</button>
+  </div>
+  <div class="ficha-rolagem" id="ficha-rolagem">
+    <div class="ficha-corpo">
+      <div class="galeria">
+        <div class="galeria-foto"><img id="galeria-img" alt=""></div>
+        <div class="filme" id="filme" aria-label="Mais fotos"></div>
+        <p class="credito" id="credito"></p>
+      </div>
+      <div class="info">
+        <div class="info-meta mono" id="ficha-meta"></div>
+        <h2 id="ficha-nome"></h2>
+        <p class="resumo" id="ficha-resumo"></p>
+
+        <div class="bloco">
+          <h3>Família e variantes</h3>
+          <div class="variantes" id="variantes"></div>
+          <div class="variante-texto" id="variante-texto"></div>
+        </div>
+
+        <div class="bloco">
+          <h3 id="specs-titulo">Ficha técnica</h3>
+          <dl class="specs" id="specs"></dl>
+          <p class="fonte-ficha" id="fonte-ficha"></p>
+        </div>
+
+        <div class="bloco">
+          <h3>Elétrica e aviônica</h3>
+          <div class="osc">
+            <div class="osc-topo"><span id="osc-motor"></span><span>2 ms/div</span></div>
+            <canvas id="ficha-osc" aria-hidden="true"></canvas>
+            <div class="osc-base"><span id="osc-desc"></span><span><b id="osc-hz"></b></span></div>
+          </div>
+          <dl class="eletrica" id="eletrica"></dl>
+          <p class="destaque-eletrico" id="destaque"></p>
+          <button class="btn btn-pequeno ouvir" id="ouvir-motor">▶ Ouvir o motor</button>
+        </div>
+
+        <div class="bloco">
+          <h3>História</h3>
+          <p id="ficha-historia"></p>
+        </div>
+
+        <div class="bloco">
+          <h3>Quem usou</h3>
+          <div class="operadores" id="operadores"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="js/dados.js"></script>
+<script src="js/fichas.js"></script>
+<script src="js/fotos.js"></script>
+<script src="js/creditos.js"></script>
+<script src="js/trilha.js"></script>
+<script src="js/app.js"></script>
+<script src="js/abertura.js"></script>
+</body>
+</html>
