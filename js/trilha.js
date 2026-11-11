@@ -264,66 +264,106 @@ window.Trilha = (() => {
     avisa();
   }
 
-  /* ---------- sons de motor ---------- */
-  // ronco a partir do número de cilindros e da rotação: a frequência
-  // fundamental é a das explosões (cilindros × rpm ÷ 120)
-  function ronco(t, p, curvaRpm, dur, saida) {
-    const cil = p.cil || 12, radial = p.tipo === "radial";
-    const f = r => Math.max(20, cil * r / 120);
-    const o = ctx.createOscillator(), sub = ctx.createOscillator(), am = ctx.createOscillator();
-    o.type = "sawtooth"; sub.type = "square"; am.type = "square";
-    const lp = filtro("lowpass", 600, 1.5);
-    const amg = ctx.createGain(), prof = ctx.createGain();
-    amg.gain.value = radial ? 0.55 : 0.75; prof.gain.value = radial ? 0.45 : 0.22;
-    am.connect(prof); prof.connect(amg.gain);
-    curvaRpm.forEach(([dt, r], k) => {
-      const tt = t + dt, metodo = k === 0 ? "setValueAtTime" : "linearRampToValueAtTime";
-      o.frequency[metodo](f(r), tt);
-      sub.frequency[metodo](f(r) / 2, tt);
-      am.frequency[metodo](r / 60, tt);
-      lp.frequency[metodo]((radial ? 380 : 650) + r * (radial ? 0.3 : 0.55), tt);
-    });
-    const sh = ctx.createWaveShaper(); sh.curve = curva;
-    const g = ctx.createGain();
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(0.5, t + 0.12);
-    g.gain.setValueAtTime(0.5, t + dur - 0.5);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o.connect(lp); sub.connect(lp); lp.connect(sh); sh.connect(amg); amg.connect(g); g.connect(saida || sfx);
-    [o, sub, am].forEach(x => { x.start(t); x.stop(t + dur + 0.05); });
+  /* ---------- sons de motor: gravações reais em audio/ ---------- */
+  // Cada clipe é um trecho (ini–fim) de um arquivo. Toca pelo Web Audio, com ganho próprio
+  // e um compressor na saída pra nivelar gravações baixas e altas sem estourar.
+  const SONS = window.SONS || { pasta: "", clipes: {}, familias: {} };
+  const buffers = {};                       // arq → Promise<AudioBuffer>
+  let saidaSons = null, tocandoSons = [], elAtual = null;
+  function carregar(arq) {
+    if (!buffers[arq]) {
+      buffers[arq] = fetch(SONS.pasta + arq)
+        .then(r => { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); })
+        .then(b => new Promise((ok, erro) => {
+          const AC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+          new AC(1, 1, 44100).decodeAudioData(b, ok, erro);
+        }));
+      buffers[arq].catch(() => {});
+    }
+    return buffers[arq];
   }
-  function jato(t, rpm, dur) {
-    const n = fonteRuido(t, dur), bp = filtro("bandpass", 500, 0.7), g = ctx.createGain();
-    bp.frequency.setValueAtTime(400, t); bp.frequency.linearRampToValueAtTime(1400, t + dur * 0.45); bp.frequency.linearRampToValueAtTime(600, t + dur);
-    g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.45, t + dur * 0.4); g.gain.linearRampToValueAtTime(0.0001, t + dur);
-    n.connect(bp); bp.connect(g); g.connect(sfx);
-    const o = ctx.createOscillator(), og = ctx.createGain();
-    o.type = "sine"; o.frequency.setValueAtTime(rpm / 60 * 4, t); o.frequency.linearRampToValueAtTime(rpm / 60 * 12, t + dur * 0.45); o.frequency.linearRampToValueAtTime(rpm / 60 * 6, t + dur);
-    og.gain.setValueAtTime(0.0001, t); og.gain.linearRampToValueAtTime(0.05, t + dur * 0.4); og.gain.linearRampToValueAtTime(0.0001, t + dur);
-    o.connect(og); og.connect(sfx); o.start(t); o.stop(t + dur + 0.05);
+  function saida() {
+    if (!saidaSons) {
+      const comp = ctx.createDynamicsCompressor();
+      comp.threshold.value = -14; comp.knee.value = 10; comp.ratio.value = 6; comp.attack.value = 0.004; comp.release.value = 0.2;
+      saidaSons = ctx.createGain();
+      saidaSons.gain.value = 0.9;
+      saidaSons.connect(comp);
+      comp.connect(ctx.destination);
+    }
+    return saidaSons;
+  }
+  function infoFamilia(id) {
+    const f = SONS.familias[id] || { clipes: [] };
+    return { nota: f.nota || "", mesmo: !!f.mesmo, clipes: (f.clipes || []).filter(n => SONS.clipes[n]).map(n => ({ nome: n, ...SONS.clipes[n] })) };
+  }
+  function pararSom(rapido) {
+    const t = ctx ? ctx.currentTime : 0, d = rapido ? 0.12 : 0.5;
+    tocandoSons.forEach(s => {
+      try {
+        s.g.gain.cancelScheduledValues(t);
+        s.g.gain.setValueAtTime(Math.max(0.0001, s.g.gain.value), t);
+        s.g.gain.exponentialRampToValueAtTime(0.0001, t + d);
+        s.src.stop(t + d + 0.05);
+      } catch (e) {}
+    });
+    tocandoSons = [];
+    if (elAtual) { elAtual.pause(); elAtual = null; }
+  }
+  // agenda um trecho de um buffer já carregado; devolve a duração
+  function agendar(buf, c, quando, opc = {}) {
+    const ini = opc.ini ?? c.ini ?? 0, fim = Math.min(opc.fim ?? c.fim ?? buf.duration, buf.duration);
+    const dur = Math.max(0.1, fim - ini), ganho = (c.ganho || 1) * (opc.ganho ?? 1);
+    const fadeIn = opc.fadeIn ?? 0.25, fadeOut = Math.min(opc.fadeOut ?? 1.2, dur / 2);
+    const src = ctx.createBufferSource(), g = ctx.createGain();
+    src.buffer = buf;
+    g.gain.setValueAtTime(0.0001, quando);
+    g.gain.exponentialRampToValueAtTime(ganho, quando + fadeIn);
+    g.gain.setValueAtTime(ganho, quando + dur - fadeOut);
+    g.gain.exponentialRampToValueAtTime(0.0001, quando + dur);
+    src.connect(g); g.connect(saida());
+    src.start(quando, ini, dur + 0.05);
+    const item = { src, g };
+    tocandoSons.push(item);
+    src.onended = () => { tocandoSons = tocandoSons.filter(x => x !== item); if (opc.aoFim) opc.aoFim(); };
+    return dur;
   }
   function abaixaMusica(dur) {
     if (!tocando) return;
     const t = ctx.currentTime;
     musica.gain.cancelScheduledValues(t);
     musica.gain.setValueAtTime(musica.gain.value, t);
-    musica.gain.linearRampToValueAtTime(0.25, t + 0.15);
-    musica.gain.setValueAtTime(0.25, t + dur - 0.3);
+    musica.gain.linearRampToValueAtTime(0.2, t + 0.15);
+    musica.gain.setValueAtTime(0.2, t + dur - 0.3);
     musica.gain.linearRampToValueAtTime(1, t + dur);
   }
-  // "ouvir o motor" na ficha: marcha lenta, acelera, volta
-  function motor(p) {
-    if (!init()) return;
+  // "ouvir o motor" na ficha: toca um clipe pelo nome; aoFim avisa a interface
+  function motor(nome, aoFim) {
+    const c = SONS.clipes[nome];
+    if (!c || !init()) return false;
     if (ctx.state === "suspended") ctx.resume();
-    const t = ctx.currentTime + 0.03, rpm = p.rpm || 3000;
-    abaixaMusica(2.8);
-    if (p.tipo === "jato") { jato(t, rpm, 2.6); return; }
-    ronco(t, p, [[0, rpm * 0.3], [0.4, rpm * 0.3], [1.2, rpm], [1.8, rpm], [2.6, rpm * 0.35]], 2.8);
+    pararSom(true);
+    const fimOk = () => { if (aoFim) aoFim(); };
+    carregar(c.arq).then(buf => {
+      const dur = agendar(buf, c, ctx.currentTime + 0.05, { aoFim: fimOk });
+      abaixaMusica(dur + 0.4);
+    }).catch(() => {
+      // sem fetch (página aberta direto do disco): toca pelo elemento de áudio
+      const a = new Audio(`${SONS.pasta}${c.arq}#t=${c.ini},${c.fim}`);
+      a.volume = Math.min(1, c.ganho || 1);
+      a.ontimeupdate = () => { if (a.currentTime >= c.fim) { a.pause(); fimOk(); } };
+      a.onended = fimOk;
+      elAtual = a;
+      a.play().catch(fimOk);
+    });
+    return true;
   }
 
-  // abertura: partida do Allison V-1710 do P-39 (12 cilindros)
-  const CURVA_ABERTURA = [[0, 0], [0.6, 160], [0.75, 120], [0.95, 650], [1.6, 820], [2.4, 2600], [3.4, 2700], [4.2, 1200]];
-  function rpmAbertura(dt) {          // dt = segundos desde o início da partida
+  // abertura: partida real do Allison V-1710. Tempos medidos na gravação (a partir do início do trecho):
+  // 0,25 s o arranque começa a girar · 6,0 s o motor pega · 7,0 s pico
+  const AB = { arranque: 0.25, pega: 6.0, pico: 7.0, fim: 9.5 };
+  const CURVA_ABERTURA = [[0, 0], [0.25, 0], [0.9, 140], [5.6, 190], [6.0, 260], [6.5, 900], [7.0, 1500], [8.2, 1150], [9.5, 1050], [30, 1050]];
+  function rpmAbertura(dt) {          // dt = segundos desde o início do trecho da partida
     const c = CURVA_ABERTURA;
     if (dt <= 0) return 0;
     for (let i = 1; i < c.length; i++) {
@@ -331,32 +371,19 @@ window.Trilha = (() => {
     }
     return c[c.length - 1][1];
   }
-  let partidaBus = null;
+  // toca a partida em t (relógio do áudio) e, quando o motor pega, emenda a decolagem por baixo
   function partida(t) {
-    if (!init()) return;
-    partidaBus = ctx.createGain();
-    partidaBus.connect(sfx);
-    // motor de arranque elétrico
-    const o = ctx.createOscillator(), g = ctx.createGain(), lp = filtro("lowpass", 1400);
-    o.type = "sawtooth";
-    o.frequency.setValueAtTime(70, t); o.frequency.exponentialRampToValueAtTime(420, t + 0.7);
-    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.12, t + 0.2); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.9);
-    o.connect(lp); lp.connect(g); g.connect(partidaBus); o.start(t); o.stop(t + 1);
-    // tossidas antes de pegar
-    [0.62, 0.78].forEach((d, k) => {
-      const n = fonteRuido(t + d, 0.2), f = filtro("lowpass", 900), ng = ctx.createGain();
-      env(ng, t + d, 0.004, 0.35 + k * 0.1, 0.18);
-      n.connect(f); f.connect(ng); ng.connect(partidaBus);
-    });
-    // o motor pega e acelera (mesma curva do mostrador)
-    ronco(t + 0.9, { cil: 12, tipo: "linha" }, CURVA_ABERTURA.slice(2).map(([dt, r]) => [dt - 0.9, r]), 3.8, partidaBus);
+    const ab = SONS.abertura || {};
+    const c = SONS.clipes[ab.partida], v = SONS.clipes[ab.voo];
+    if (!c || !init()) return;
+    carregar(c.arq).then(buf => agendar(buf, c, Math.max(ctx.currentTime, t), { fadeIn: 0.15, fadeOut: 2.2 })).catch(() => {});
+    if (v) carregar(v.arq).then(buf => agendar(buf, v, Math.max(ctx.currentTime, t + AB.pico - 0.2), { ini: 12.5, fim: 21, ganho: 0.8, fadeIn: 1.2, fadeOut: 3.5 })).catch(() => {});
   }
-  function pararPartida() {
-    if (!partidaBus) return;
-    const t = ctx.currentTime;
-    partidaBus.gain.cancelScheduledValues(t);
-    partidaBus.gain.setValueAtTime(partidaBus.gain.value, t);
-    partidaBus.gain.linearRampToValueAtTime(0.0001, t + 0.3);
+  function pararPartida() { pararSom(true); }
+  // pré-carrega os arquivos da abertura enquanto o portão está na tela
+  function preparar() {
+    const ab = SONS.abertura || {};
+    return Promise.all([ab.partida, ab.voo].filter(n => SONS.clipes[n]).map(n => carregar(SONS.clipes[n].arq))).catch(() => {});
   }
 
   /* ---------- avisos para a interface ---------- */
@@ -364,7 +391,7 @@ window.Trilha = (() => {
   function avisa() { ouvintes.forEach(fn => fn(tocando)); }
 
   return {
-    init, ligar, desligar, motor, partida, pararPartida, rpmAbertura,
+    init, ligar, desligar, motor, infoFamilia, pararSom, tempos: AB, partida, pararPartida, preparar, rpmAbertura,
     tocando: () => tocando,
     ativo: () => !!ctx,
     contexto: () => ctx,

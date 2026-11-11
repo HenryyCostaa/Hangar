@@ -38,16 +38,22 @@
   </div>
 </div>
 
-<!-- ============ ABERTURA: partida elétrica do P-39Q-1 ============ -->
+<!-- ============ ABERTURA: partida na cabine do P-39Q-1 ============ -->
 <div class="abertura" id="abertura" hidden>
-  <div class="ab-foto" id="ab-foto"></div>
-  <div class="ab-caixa" id="ab-caixa">
-    <p class="mono mudo" style="margin:0">Bell P-39Q-1 Airacobra · sequência de partida</p>
-    <div class="ab-painel mono" id="ab-painel"></div>
-    <canvas class="ab-osc" id="ab-osc" aria-hidden="true"></canvas>
-    <div class="ab-leitura mono">
-      <span>Rotação <b id="ab-rpm">0</b> rpm</span>
-      <span>Ignição <b id="ab-hz">0</b> pulsos/s</span>
+  <div class="ab-vidro">
+    <div class="ab-foto" id="ab-foto"></div>
+    <p class="ab-passo" id="ab-passo"><small>P-39Q-1 · sequência de partida</small>Cabine fria</p>
+    <p class="ab-titulo">HANGAR<small>Caças 1939–1945 · 8 nações · peça por peça</small></p>
+  </div>
+  <div class="ab-painel" id="ab-painel">
+    <div class="ab-placa mono"><span>Bell P-39Q-1 Airacobra</span><span>Allison V-1710-85 · 12 cilindros · 24 V CC</span></div>
+    <div class="ab-relogios" id="ab-relogios"></div>
+    <div class="ab-baixo">
+      <div class="ab-chaves" id="ab-chaves"></div>
+      <div class="ab-tela">
+        <canvas class="ab-osc" id="ab-osc" aria-hidden="true"></canvas>
+        <p class="ab-status mono" id="ab-status" aria-live="polite">Cabine fria</p>
+      </div>
     </div>
   </div>
   <button class="ab-pular mono" id="ab-pular">Pular (Esc)</button>
@@ -61,7 +67,6 @@
     <a href="#comparar">Comparar</a>
     <a href="#linha">Linha do tempo</a>
     <a href="#bancada">Bancada</a>
-    <a href="#projetos">Projetos</a>
     <a href="#sobre">Sobre</a>
   </nav>
   <button class="som-btn" id="som-btn" aria-pressed="false" aria-label="Ligar a trilha de fundo">
@@ -92,7 +97,7 @@
     <header class="secao-topo">
       <p class="mono ambar">01 · Hangar</p>
       <h2>Escolha a nação</h2>
-      <p>Cada nação mostra os caças que projetou e também os que usou. Os finlandeses, por exemplo, voaram Brewster, Fiat, Morane e Messerschmitt.</p>
+      <p>Cada caça fica na nação que o projetou. Abra a família pra ver todas as variantes, o motor e a história.</p>
     </header>
     <div class="nacoes" id="nacoes" role="group" aria-label="Nações"></div>
     <div class="filtros">
@@ -185,20 +190,10 @@
     </div>
   </section>
 
-  <!-- PROJETOS -->
-  <section class="secao" id="projetos">
-    <header class="secao-topo">
-      <p class="mono ambar">05 · Projetos</p>
-      <h2>Na prancheta</h2>
-      <p>Aeromodelos que eu quero construir.</p>
-    </header>
-    <div class="projetos" id="projetos-grid"></div>
-  </section>
-
   <!-- SOBRE -->
   <section class="secao" id="sobre">
     <header class="secao-topo">
-      <p class="mono ambar">06 · Sobre</p>
+      <p class="mono ambar">05 · Sobre</p>
       <h2>Por que este hangar</h2>
     </header>
     <div class="sobre-grid">
@@ -252,6 +247,14 @@
         </div>
 
         <div class="bloco">
+          <h3>O motor</h3>
+          <p class="motor-nome mono" id="motor-nome"></p>
+          <div class="texto-longo" id="motor-texto"></div>
+          <div class="sons" id="sons"></div>
+          <p class="credito" id="som-legenda"></p>
+        </div>
+
+        <div class="bloco">
           <h3>Elétrica e aviônica</h3>
           <div class="osc">
             <div class="osc-topo"><span id="osc-motor"></span><span>2 ms/div</span></div>
@@ -260,17 +263,11 @@
           </div>
           <dl class="eletrica" id="eletrica"></dl>
           <p class="destaque-eletrico" id="destaque"></p>
-          <button class="btn btn-pequeno ouvir" id="ouvir-motor">▶ Ouvir o motor</button>
         </div>
 
         <div class="bloco">
           <h3>História</h3>
-          <p id="ficha-historia"></p>
-        </div>
-
-        <div class="bloco">
-          <h3>Quem usou</h3>
-          <div class="operadores" id="operadores"></div>
+          <div class="texto-longo" id="ficha-historia"></div>
         </div>
       </div>
     </div>
@@ -278,9 +275,17 @@
 </div>
 
 <script src="js/dados.js"></script>
+<script src="js/variantes/eua.js"></script>
+<script src="js/variantes/ru.js"></script>
+<script src="js/variantes/ale.js"></script>
+<script src="js/variantes/urss.js"></script>
+<script src="js/variantes/jap.js"></script>
+<script src="js/variantes/ita-fra-fin.js"></script>
+<script src="js/historias.js"></script>
 <script src="js/fichas.js"></script>
 <script src="js/fotos.js"></script>
 <script src="js/creditos.js"></script>
+<script src="js/fotos-variantes.js"></script>
 <script src="js/trilha.js"></script>
 <script src="js/app.js"></script>
 <script src="js/abertura.js"></script>

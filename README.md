@@ -2,9 +2,9 @@
 
 Portfólio sobre caças da Segunda Guerra, com olhar de engenharia elétrica.
 
-- **Abertura**: a sequência de partida elétrica do P-39Q-1 (bateria, gerador, magnetos, partida), com o osciloscópio mostrando a ignição acelerando.
-- **Hangar**: 34 famílias de caças de 8 nações (EUA, Reino Unido, Alemanha, URSS, Japão, Itália, França e Finlândia). Cada nação mostra os caças que projetou e os que usou, com filtros por motor e papel, ordenação e busca.
-- **Ficha da família**: galeria, linha de variantes clicável, ficha técnica completa (métrica e imperial), elétrica e aviônica com osciloscópio, botão "ouvir o motor", história e operadores.
+- **Abertura**: você na cabine do P-39Q-1. Chaves ligando na ordem real (bateria, bomba, magnetos, primer, partida), cinco relógios reagindo e a gravação real de um Allison V-1710 dando partida.
+- **Hangar**: 34 famílias de caças de 8 nações (EUA, Reino Unido, Alemanha, URSS, Japão, Itália, França e Finlândia). Cada avião aparece só na nação que o projetou. Tem filtros por motor e papel, ordenação e busca.
+- **Ficha da família**: galeria, linha de variantes clicável (cada uma com foto, motor, armamento, texto técnico e o que mudou em relação à anterior), ficha técnica completa (métrica e imperial), o motor com gravações reais (partida, decolagem, rasante), elétrica e aviônica com osciloscópio, e história.
 - **Comparador**: até 3 caças lado a lado.
 - **Linha do tempo**: primeiro voo de cada família, por nação.
 - **Bancada**: laboratório de ignição (tipo de motor e rpm → faíscas por segundo).
@@ -14,12 +14,18 @@ Portfólio sobre caças da Segunda Guerra, com olhar de engenharia elétrica.
 
 | O quê | Arquivo |
 |---|---|
-| Famílias, variantes, elétrica, história, fotos de cada uma | `js/dados.js` (`FAMILIAS`) |
+| Famílias, elétrica, história, fotos de cada uma | `js/dados.js` (`FAMILIAS`) |
+| Variantes (foto, motor, armas, seções técnicas, sub-versões, o que mudou), um arquivo por nação | `js/variantes/` |
 | Correções da ficha técnica e armamento | `js/dados.js` (`AJUSTES_FICHA`, `ARMAMENTO`) |
-| Seus aeromodelos | `js/dados.js` (`PROJETOS`) |
+| Textos longos de motor e história de cada família | `js/historias.js` (`HISTORIAS`) |
 | Texto do "Sobre" | `index.html` (seção SOBRE) |
 | Cores e fontes | `css/style.css` (topo) |
-| A trilha e os sons de motor | `js/trilha.js` |
+| A trilha de fundo | `js/trilha.js` |
+| Sons de motor (gravações em `audio/`, trechos, volume e qual família usa cada uma) | `js/dados.js` (`SONS`) |
+
+### Sons
+
+As gravações em `audio/` são de aviões restaurados, baixadas do Freesound sob licenças Creative Commons (CC BY e CC BY-NC). Autor e link de cada uma aparecem na seção Sobre. As NC só podem ser usadas sem fins comerciais.
 
 ### Fichas técnicas
 

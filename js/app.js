@@ -7,6 +7,8 @@
   const NAC = window.NACOES, FAM = window.FAMILIAS, FICHAS = window.FICHAS || {};
   const AJ = window.AJUSTES_FICHA || {}, ARM = window.ARMAMENTO || {}, CR = window.CREDITOS || {}, FOTOS = window.FOTOS || {};
   const T = window.Trilha;
+  const VAR = window.VARIANTES || {}, HIST = window.HISTORIAS || {};
+  FAM.forEach(f => { if (VAR[f.id]) f.variantes = VAR[f.id]; });
   const reduz = matchMedia("(prefers-reduced-motion: reduce)").matches;
   const n0 = v => new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 0 }).format(v);
   const n1 = v => new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 1 }).format(v);
@@ -140,7 +142,7 @@
   /* ---------- números do topo ---------- */
   const totalVariantes = FAM.reduce((s, f) => s + f.variantes.length, 0);
   $("#numeros").innerHTML = [
-    [FAM.length, "famílias de caças"], [NAC.length, "nações"], [totalVariantes, "variantes"], [Object.keys(FOTOS).length, "fotos"]
+    [FAM.length, "famílias de caças"], [NAC.length, "nações"], [totalVariantes, "variantes"], [new Set(["p39-noite", ...FAM.flatMap(f => [...f.fotos, ...f.variantes.map(v => v.foto)])].filter(k => k && FOTOS[k])).size, "fotos"]
   ].map(([v, r]) => `<div><b>${v}</b><span>${r}</span></div>`).join("");
   $("#portao-sub").textContent = `${FAM.length} famílias de caças, ${NAC.length} nações, fichas completas e o lado elétrico de cada avião.`;
   $("#hero-foto").style.backgroundImage = `url("${abs(fotoUrl("p39-noite"))}")`;
@@ -152,19 +154,12 @@
   const papeis = [...new Set(FAM.map(f => f.papel))].sort();
   $("#f-papel").innerHTML += papeis.map(p => `<option>${esc(p)}</option>`).join("");
 
-  function contaNacao(id) {
-    const proj = FAM.filter(f => f.nacao === id).length;
-    const usados = FAM.filter(f => f.nacao !== id && f.operadores.includes(id)).length;
-    return { proj, usados };
-  }
   function desenharNacoes() {
     $("#nacoes").innerHTML =
       `<button class="nacao ${estado.nacao === "" ? "on" : ""}" data-n=""><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="13" fill="none" stroke="#8f8d87" stroke-width="1.5"/><path d="M3 16h26M16 3c-6 7-6 19 0 26M16 3c6 7 6 19 0 26" fill="none" stroke="#8f8d87" stroke-width="1.2"/></svg><span><b>Todas</b><small>${FAM.length} famílias</small></span></button>` +
       NAC.map(n => {
-        const c = contaNacao(n.id);
-        const proj = `${c.proj} ${c.proj === 1 ? "projetada" : "projetadas"}`;
-        const usados = c.usados ? ` · ${c.usados} ${c.usados === 1 ? "usada" : "usadas"}` : "";
-        return `<button class="nacao ${estado.nacao === n.id ? "on" : ""}" data-n="${n.id}">${insignia(n.id)}<span><b>${esc(n.nome)}</b><small>${proj}${usados}</small></span></button>`;
+        const c = FAM.filter(f => f.nacao === n.id).length;
+        return `<button class="nacao ${estado.nacao === n.id ? "on" : ""}" data-n="${n.id}">${insignia(n.id)}<span><b>${esc(n.nome)}</b><small>${c} ${c === 1 ? "família" : "famílias"}</small></span></button>`;
       }).join("");
     $$("#nacoes .nacao").forEach(b => b.addEventListener("click", () => { estado.nacao = b.dataset.n; desenharNacoes(); desenharGrade(); }));
   }
@@ -172,7 +167,7 @@
   function filtradas() {
     const q = estado.busca.trim().toLowerCase();
     let l = FAM.filter(f => {
-      if (estado.nacao && f.nacao !== estado.nacao && !f.operadores.includes(estado.nacao)) return false;
+      if (estado.nacao && f.nacao !== estado.nacao) return false;
       if (estado.motor && f.motor.tipo !== estado.motor) return false;
       if (estado.papel && f.papel !== estado.papel) return false;
       if (q) {
@@ -199,11 +194,10 @@
       : `${l.length} ${l.length === 1 ? "família" : "famílias"}`;
     $("#grade").innerHTML = l.length ? l.map(f => {
       const fi = fichaFam(f);
-      const usado = estado.nacao && f.nacao !== estado.nacao;
       return `<button class="card" data-id="${f.id}">
         <div class="card-foto" style="background-image:url('${abs(fotoUrl(f.fotos[0], true))}')">${insignia(f.nacao, "ins")}</div>
         <div class="card-corpo">
-          <span class="card-meta">${esc(f.fabricante)} · ${f.primeiroVoo.slice(0, 4)}${usado ? ` · <span class="ambar">usado pela ${esc(n.nome)}</span>` : ""}</span>
+          <span class="card-meta">${esc(f.fabricante)} · ${f.primeiroVoo.slice(0, 4)}</span>
           <h3>${esc(f.nome)}</h3>
           <span class="card-meta">${esc(f.papel)} · ${esc(f.motor.nome)}</span>
           <div class="card-dados">
@@ -239,7 +233,6 @@
     $("#ficha-meta").innerHTML = `${insignia(f.nacao)}<span>${esc(f.fabricante)}</span><span>${esc(n.nome)}</span><span>1º voo ${f.primeiroVoo.slice(0, 4)}</span><span>Em serviço ${esc(f.servico)}</span><span>${esc(f.papel)}</span><span>Produção ${esc(f.produzidos)}</span>`;
     $("#ficha-nome").textContent = f.nome;
     $("#ficha-resumo").textContent = f.resumo;
-    $("#ficha-historia").textContent = f.historia;
 
     // galeria
     const fotos = f.fotos.length ? f.fotos : [];
@@ -275,9 +268,20 @@
     $("#destaque").textContent = e.destaque || "";
     $("#destaque").hidden = !e.destaque;
 
-    // operadores
-    $("#operadores").innerHTML = f.operadores.map(o => nacao(o)).filter(Boolean)
-      .map(o => `<span>${insignia(o.id)}${esc(o.nome)}</span>`).join("");
+    // o motor: texto longo + gravações reais
+    const h = HIST[f.id] || {};
+    $("#motor-nome").textContent = jato ? `${m.nome} · turbojato` : `${m.nome} · ${m.cil} cilindros${m.tipo === "radial" ? " em estrela" : m.cil === 24 ? " em H" : " em V"}`;
+    $("#motor-texto").innerHTML = (h.motor || []).map(p => `<p>${esc(p)}</p>`).join("");
+    T.pararSom(true);
+    const som = T.infoFamilia(f.id);
+    $("#sons").innerHTML = som.clipes.map(c => `<button class="btn btn-pequeno" data-som="${esc(c.nome)}" data-rotulo="${esc(c.rotulo)}">▶ ${esc(c.rotulo)}</button>`).join("");
+    $$("#sons button").forEach(b => b.addEventListener("click", () => tocarSom(b)));
+    $("#som-legenda").textContent = som.clipes.length ? `Gravação real. ${som.nota}` : som.nota;
+
+    // história: seções com título, ou o texto curto de dados.js
+    $("#ficha-historia").innerHTML = h.historia && h.historia.length
+      ? h.historia.map(([t, txt]) => `<h4>${esc(t)}</h4><p>${esc(txt)}</p>`).join("")
+      : `<p>${esc(f.historia)}</p>`;
 
     if (fichaEl.hidden) {
       voltarFoco = document.activeElement;
@@ -307,29 +311,63 @@
   }
 
   function mostrarVariante(f, k) {
-    const v = f.variantes[k];
+    const v = f.variantes[k], ant = f.variantes[k - 1];
     $$("#variantes button").forEach((b, j) => b.classList.toggle("on", j === k));
     let mini = "";
     if (v.ficha) {
       const fv = fichaDe(v.ficha);
       if (fv) {
         mini = `<div class="variante-mini">
-          ${fv.motor ? `<span>Motor <b>${esc(fv.motor)}</b></span>` : ""}
-          ${fv.hp ? `<span>Potência <b>${n0(fv.hp)} hp</b></span>` : ""}
           ${fv.velMax ? `<span>Vel. máx. <b>${n0(fv.velMax)} km/h</b></span>` : ""}
           ${fv.teto ? `<span>Teto <b>${n0(fv.teto)} m</b></span>` : ""}
           ${fv.pesoVazio ? `<span>Peso vazio <b>${n0(fv.pesoVazio)} kg</b></span>` : ""}
-          ${ARM[v.ficha] ? `<span>Armas <b>${esc(ARM[v.ficha])}</b></span>` : ""}
         </div>`;
       }
     }
-    $("#variante-texto").innerHTML = `<span class="ano">${esc(v.nome)} · ${v.ano}${v.principal ? " · variante da ficha" : ""}</span><p>${esc(v.texto)}</p>${mini}`;
+    // foto da variante; sem ela, a primeira da família
+    const temFoto = v.foto && FOTOS[v.foto];
+    const nomeFoto = temFoto ? v.foto : f.fotos[0];
+    const c = CR[nomeFoto];
+    const credito = c ? `Foto: ${esc(c.autor || "autor desconhecido")} · ${esc(c.licenca)}${seguro(c.fonte) ? ` · <a href="${c.fonte}" target="_blank" rel="noopener">fonte</a>` : ""}` : "";
+    const mudou = v.mudou && v.mudou.length
+      ? `<h4>O que mudou${ant ? ` desde o ${esc(ant.nome)}` : ""}</h4><ul class="mudou">${v.mudou.map(m => `<li>${esc(m)}</li>`).join("")}</ul>`
+      : `<h4>Ponto de partida</h4><p class="mudo">Primeira versão da família.</p>`;
+    $("#variante-texto").innerHTML = `<div class="var-grade">
+      <figure class="var-foto">
+        <img src="${abs(fotoUrl(nomeFoto, true))}" alt="${esc(f.nome)} ${esc(v.nome)}" loading="lazy">
+        <figcaption>${temFoto ? "" : "Sem foto desta variante; foto da família. "}${credito}</figcaption>
+      </figure>
+      <div class="var-info">
+        <span class="ano">${esc(v.nome)} · ${v.ano}${v.principal ? " · variante da ficha" : ""}</span>
+        <dl class="var-dados">
+          ${v.motor ? `<dt>Motor</dt><dd>${esc(v.motor)}</dd>` : ""}
+          ${v.armas ? `<dt>Armas</dt><dd>${esc(v.armas)}</dd>` : ""}
+          ${v.prod ? `<dt>Produção</dt><dd>${esc(v.prod)}</dd>` : ""}
+        </dl>
+        ${mini}
+        <p>${esc(v.texto)}</p>
+        ${mudou}
+      </div></div>
+      ${secoesVariante(v)}`;
+  }
+
+  // seções técnicas e sub-versões, abaixo da foto
+  const SECOES = [["motor", "Motor e hélice"], ["armas", "Armamento"], ["estrutura", "Estrutura e aerodinâmica"],
+    ["sistemas", "Sistemas, blindagem e equipamento"], ["pintura", "Pintura e uso em campo"]];
+  function secoesVariante(v) {
+    const s = v.secoes || {};
+    const blocos = SECOES.filter(([k]) => s[k]).map(([k, t]) => `<section><h4>${t}</h4><p>${esc(s[k])}</p></section>`).join("");
+    const subs = v.sub && v.sub.length
+      ? `<section class="var-subs"><h4>Sub-versões e blocos de produção</h4><dl>${v.sub.map(x => `<dt>${esc(x.nome)}</dt><dd>${esc(x.texto)}</dd>`).join("")}</dl></section>`
+      : "";
+    return blocos || subs ? `<div class="var-secoes">${blocos}${subs}</div>` : "";
   }
 
   function fecharFicha(semHistorico) {
     if (fichaEl.hidden) return;
     fichaEl.hidden = true;
     oscFicha.ativo = false;
+    T.pararSom();
     document.body.classList.remove("com-ficha");
     if (!semHistorico && history.state && history.state.ficha) history.back();
     if (voltarFoco && voltarFoco.focus) voltarFoco.focus();
@@ -338,7 +376,15 @@
 
   $("#ficha-voltar").addEventListener("click", () => fecharFicha());
   $("#ficha-fechar").addEventListener("click", () => fecharFicha());
-  $("#ouvir-motor").addEventListener("click", () => { if (atual) T.motor(atual.motor); });
+  // botões de som: um toca por vez; clicar de novo para
+  function tocarSom(b) {
+    const tocava = b.classList.contains("tocando");
+    $$("#sons button").forEach(x => { x.classList.remove("tocando"); x.textContent = `▶ ${x.dataset.rotulo}`; });
+    T.pararSom(true);
+    if (tocava) return;
+    const fim = () => { b.classList.remove("tocando"); b.textContent = `▶ ${b.dataset.rotulo}`; };
+    if (T.motor(b.dataset.som, fim)) { b.classList.add("tocando"); b.textContent = `■ Parar`; }
+  }
   $("#ficha-comparar").addEventListener("click", () => {
     if (!atual) return;
     if (!comp.includes(atual.id)) { comp.shift(); comp.push(atual.id); }
@@ -447,31 +493,15 @@
     new IntersectionObserver(es => es.forEach(e => { oscLab.ativo = e.isIntersecting; })).observe($("#lab-osc"));
   } else oscLab.ativo = true;
 
-  /* ---------- projetos ---------- */
-  const slug = s => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z]+/g, "-");
-  $("#projetos-grid").innerHTML = (window.PROJETOS || []).map(p => `
-    <article class="projeto">
-      <div class="projeto-foto" style="background-image:url('${abs(fotoUrl(p.foto, true))}')"></div>
-      <div class="projeto-corpo">
-        <span class="status s-${slug(p.status)}">${esc(p.status)}</span>
-        <h3>${esc(p.nome)}</h3>
-        <p>${esc(p.notas)}</p>
-        <dl class="mini-specs">
-          <dt>Tipo</dt><dd>${esc(p.tipo)}</dd>
-          <dt>Envergadura</dt><dd>${esc(p.envergadura)}</dd>
-          <dt>Motor</dt><dd>${esc(p.motor)}</dd>
-          <dt>Material</dt><dd>${esc(p.material)}</dd>
-        </dl>
-      </div>
-    </article>`).join("");
-
   /* ---------- créditos ---------- */
-  $("#creditos-lista").innerHTML = Object.keys(CR).map(k => {
+  const usadas = new Set(["p39-noite", ...FAM.flatMap(f => [...f.fotos, ...f.variantes.map(v => v.foto).filter(Boolean)])]);
+  $("#creditos-lista").innerHTML = Object.keys(CR).filter(k => usadas.has(k)).map(k => {
     const c = CR[k], fonte = seguro(c.fonte);
     const titulo = fonte ? decodeURIComponent(fonte.split("/").pop()).replace(/^File:/, "").replace(/_/g, " ").replace(/\.(jpe?g|png|tiff?)$/i, "") : k;
     const lic = seguro(c.licencaUrl) ? `<a href="${c.licencaUrl}" target="_blank" rel="noopener">${esc(c.licenca)}</a>` : esc(c.licenca);
     return `<li>${fonte ? `<a href="${fonte}" target="_blank" rel="noopener">${esc(titulo)}</a>` : esc(titulo)} — ${esc(c.autor || "autor desconhecido")} · ${lic}</li>`;
-  }).join("");
+  }).join("") + ((window.SONS && window.SONS.creditos) || []).filter(Boolean).map(c =>
+    `<li>Som: <a href="${seguro(c.fonte) || "#"}" target="_blank" rel="noopener">${esc(c.titulo)}</a> — ${esc(c.autor)} · ${esc(c.licenca)}</li>`).join("");
 
   /* ---------- botão de som + mini visualizador ---------- */
   const somBtn = $("#som-btn"), somViz = $("#som-viz"), sg = somViz.getContext("2d");
