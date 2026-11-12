@@ -158,7 +158,11 @@ img { display: block; max-width: 100%; }
 }
 .abertura.saindo { opacity: 0; pointer-events: none; }
 .ab-grade { position: absolute; inset: 0; width: 100%; height: 100%; display: block; transition: opacity 1.2s ease; }
-.abertura.final .ab-grade { opacity: .55; }
+.ab-grade { cursor: grab; touch-action: none; }
+.abertura.girando .ab-grade { cursor: grabbing; }
+.ab-dica { position: absolute; z-index: 1; left: var(--borda); bottom: 22px; margin: 0; font-family: var(--mono); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--mudo); pointer-events: none; }
+.ab-entrar { position: absolute; z-index: 2; right: var(--borda); bottom: 18px; padding: 12px 18px; border-radius: 6px; background: var(--ambar); color: #140c00; font-family: var(--mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; opacity: 0; transform: translateY(10px); transition: opacity .6s, transform .6s var(--ease); pointer-events: none; }
+.abertura.final .ab-entrar { opacity: 1; transform: none; pointer-events: auto; }
 .abertura::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse at 50% 50%, transparent 45%, rgba(0, 0, 0, .75) 100%); }
 .ab-hud { position: absolute; inset: 0; z-index: 1; pointer-events: none; font-family: var(--mono); text-transform: uppercase; letter-spacing: .08em; }
 .ab-marca { position: absolute; z-index: 1; left: var(--borda); top: 22px; margin: 0; font-family: var(--mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--texto); }
@@ -204,6 +208,7 @@ img { display: block; max-width: 100%; }
 }
 .ab-titulo small { display: block; margin-top: 18px; font-family: var(--mono); font-weight: 400; font-size: clamp(11px, 1.3vw, 14px); letter-spacing: .08em; color: var(--ambar); text-transform: uppercase; }
 .abertura.final .ab-titulo { opacity: 1; transform: none; }
+.ab-titulo { font-size: clamp(54px, 12vw, 180px); bottom: 12vh; }
 .abertura.final .ab-passo, .abertura.final .ab-dir { opacity: 0; transition: opacity .5s; }
 .led { width: 9px; height: 9px; border-radius: 50%; background: #2a2d30; flex: none; transition: background .2s, box-shadow .2s; }
 .ab-pular { position: absolute; right: var(--borda); top: 18px; z-index: 2; padding: 9px 13px; border: 1px solid var(--linha-2); border-radius: 6px; background: rgba(5, 6, 6, .6); }
@@ -641,4 +646,8 @@ details.creditos a:hover { color: var(--ambar); }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   .ficha.abrindo { animation: none; }
+}
+@media (max-width: 760px) {
+  .ab-dica { bottom: 76px; }
+  .ab-dica span { display: none; }
 }
