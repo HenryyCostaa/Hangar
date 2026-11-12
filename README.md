@@ -2,7 +2,7 @@
 
 Portfólio sobre caças da Segunda Guerra, com olhar de engenharia elétrica.
 
-- **Abertura**: uma malha quadriculada de onde o P-39Q-1 (visto de cima) sobe em relevo 3D, no ritmo da gravação real de um Allison V-1710 dando partida. Quando o motor pega, a malha leva uma onda de choque e a hélice dispara. Pra ver um instante parado: `?quadro=10`.
+- **Abertura**: a foto do P-39 disparando à noite vira uma malha quadriculada em relevo 2,5D (claro = perto), no ritmo da gravação real de um Allison V-1710 dando partida. Quando o motor pega, a malha leva uma onda de choque e a hélice dispara. Pra ver um instante parado: `?quadro=10`.
 - **Nações**: carrossel 3D numa sala escura, cada nação com seu caça principal na capa. A capa do centro filtra o hangar.
 - **Hangar**: 34 famílias de caças de 8 nações (EUA, Reino Unido, Alemanha, URSS, Japão, Itália, França e Finlândia). Cada avião aparece só na nação que o projetou. Tem filtros por motor e papel, ordenação e busca.
 - **Ficha da família**: galeria, linha de variantes clicável (cada uma com foto, motor, armamento, texto técnico e o que mudou em relação à anterior), ficha técnica completa (métrica e imperial), o motor com gravações reais (partida, decolagem, rasante), elétrica e aviônica com osciloscópio, e história.

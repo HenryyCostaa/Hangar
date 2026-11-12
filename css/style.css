@@ -210,7 +210,7 @@ img { display: block; max-width: 100%; }
 .ab-pular:hover { border-color: var(--texto); }
 @media (max-width: 760px) {
   .ab-dir { display: none; }
-  .ab-passo { bottom: 84px; font-size: clamp(28px, 9vw, 44px); }
+  .ab-passo { bottom: 130px; font-size: clamp(28px, 9vw, 44px); }
 }
 
 /* ---------- topo ---------- */
