@@ -40,22 +40,14 @@
 
 <!-- ============ ABERTURA: partida na cabine do P-39Q-1 ============ -->
 <div class="abertura" id="abertura" hidden>
-  <div class="ab-vidro">
-    <div class="ab-foto" id="ab-foto"></div>
+  <canvas class="ab-grade" id="ab-grade" aria-hidden="true"></canvas>
+  <div class="ab-hud">
+    <p class="ab-marca">Hangar<small>// arquivo técnico 1939–1945</small></p>
     <p class="ab-passo" id="ab-passo"><small>P-39Q-1 · sequência de partida</small>Cabine fria</p>
-    <p class="ab-titulo">HANGAR<small>Caças 1939–1945 · 8 nações · peça por peça</small></p>
+    <p class="ab-dir">Bell P-39Q-1 Airacobra<br>Allison V-1710-85 · V12<br>Motor atrás do piloto<br>Canhão de 37 mm no cubo<br><b id="ab-status" aria-live="polite">Sistemas desligados</b></p>
+    <p class="ab-leituras" id="ab-leituras"></p>
   </div>
-  <div class="ab-painel" id="ab-painel">
-    <div class="ab-placa mono"><span>Bell P-39Q-1 Airacobra</span><span>Allison V-1710-85 · 12 cilindros · 24 V CC</span></div>
-    <div class="ab-relogios" id="ab-relogios"></div>
-    <div class="ab-baixo">
-      <div class="ab-chaves" id="ab-chaves"></div>
-      <div class="ab-tela">
-        <canvas class="ab-osc" id="ab-osc" aria-hidden="true"></canvas>
-        <p class="ab-status mono" id="ab-status" aria-live="polite">Cabine fria</p>
-      </div>
-    </div>
-  </div>
+  <p class="ab-titulo">HANGAR<small>Caças 1939–1945 · 8 nações · peça por peça</small></p>
   <button class="ab-pular mono" id="ab-pular">Pular (Esc)</button>
 </div>
 
@@ -99,7 +91,13 @@
       <h2>Escolha a nação</h2>
       <p>Cada caça fica na nação que o projetou. Abra a família pra ver todas as variantes, o motor e a história.</p>
     </header>
-    <div class="nacoes" id="nacoes" role="group" aria-label="Nações"></div>
+    <div class="sala" id="sala" role="region" aria-roledescription="carrossel" aria-label="Nações">
+      <div class="palco" id="palco"></div>
+      <button class="sala-seta esq" id="sala-esq" aria-label="Nação anterior">‹</button>
+      <button class="sala-seta dir" id="sala-dir" aria-label="Próxima nação">›</button>
+      <div class="sala-pontos" id="sala-pontos"></div>
+      <div class="sala-info" id="sala-info" aria-live="polite"></div>
+    </div>
     <div class="filtros">
       <div class="campo"><label for="f-motor">Motor</label>
         <select id="f-motor">

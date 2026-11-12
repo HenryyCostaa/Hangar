@@ -154,15 +154,101 @@
   const papeis = [...new Set(FAM.map(f => f.papel))].sort();
   $("#f-papel").innerHTML += papeis.map(p => `<option>${esc(p)}</option>`).join("");
 
-  function desenharNacoes() {
-    $("#nacoes").innerHTML =
-      `<button class="nacao ${estado.nacao === "" ? "on" : ""}" data-n=""><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="13" fill="none" stroke="#8f8d87" stroke-width="1.5"/><path d="M3 16h26M16 3c-6 7-6 19 0 26M16 3c6 7 6 19 0 26" fill="none" stroke="#8f8d87" stroke-width="1.2"/></svg><span><b>Todas</b><small>${FAM.length} famílias</small></span></button>` +
-      NAC.map(n => {
-        const c = FAM.filter(f => f.nacao === n.id).length;
-        return `<button class="nacao ${estado.nacao === n.id ? "on" : ""}" data-n="${n.id}">${insignia(n.id)}<span><b>${esc(n.nome)}</b><small>${c} ${c === 1 ? "família" : "famílias"}</small></span></button>`;
-      }).join("");
-    $$("#nacoes .nacao").forEach(b => b.addEventListener("click", () => { estado.nacao = b.dataset.n; desenharNacoes(); desenharGrade(); }));
+  /* nações: capas em perspectiva, cada uma com o caça principal da nação */
+  const PRINCIPAL = { eua: "p51", ru: "spitfire", ale: "bf109", urss: "yak", jap: "a6m", ita: "macchi", fra: "d520", fin: "myrsky" };
+  const CAPAS = [
+    { id: "", nome: "Todas", forca: "8 nações", aviao: null, foto: "p39-noite" },
+    ...NAC.map(n => { const f = familia(PRINCIPAL[n.id]); return { id: n.id, nome: n.nome, forca: n.forca, aviao: f, foto: f && f.fotos[0] }; })
+  ];
+  const palco = $("#palco");
+  palco.innerHTML = CAPAS.map((c, i) => `<button class="capa" data-i="${i}" aria-label="${esc(c.nome)}${c.aviao ? " · " + esc(c.aviao.nome) : ""}">
+      <span class="capa-img" style="background-image:url('${abs(fotoUrl(c.foto, true))}')"></span>
+      <span class="capa-num">${String(i).padStart(2, "0")} / ${String(CAPAS.length - 1).padStart(2, "0")}</span>
+      ${c.id ? insignia(c.id, "ins") : ""}
+      <span class="capa-nome">${esc(c.nome)}</span>
+      <span class="capa-aviao">${c.aviao ? esc(c.aviao.nome) + " · " + c.aviao.primeiroVoo.slice(0, 4) : FAM.length + " famílias · " + totalVariantes + " variantes"}</span>
+    </button>`).join("");
+  const capas = $$(".capa", palco);
+  $("#sala-pontos").innerHTML = CAPAS.map((c, i) => `<button data-i="${i}" aria-label="${esc(c.nome)}"></button>`).join("");
+  const pontos = $$("#sala-pontos button");
+  let pos = 0, alvo = 0, arraste = null, animando = false;
+
+  function posicionar() {
+    const larg = capas[0].offsetWidth || 400;
+    capas.forEach((el, i) => {
+      const d = i - pos, a = Math.abs(d), s = Math.sign(d);
+      const x = s * (Math.min(a, 1) * larg * 0.78 + Math.max(0, a - 1) * larg * 0.42);
+      const z = -Math.min(a, 3) * 210;
+      const r = -s * Math.min(a, 1) * 32;
+      el.style.transform = `translateX(${x.toFixed(1)}px) translateZ(${z.toFixed(1)}px) rotateY(${r.toFixed(2)}deg)`;
+      el.style.opacity = a > 2.6 ? Math.max(0, 3.4 - a) : 1;
+      el.style.zIndex = 100 - Math.round(a * 10);
+      el.classList.toggle("centro", a < 0.5);
+      el.tabIndex = a < 0.5 ? 0 : -1;
+    });
   }
+  function passoCarrossel() {
+    pos += (alvo - pos) * (reduz ? 1 : 0.14);
+    if (Math.abs(alvo - pos) < 0.001) pos = alvo;
+    posicionar();
+    if (pos !== alvo) requestAnimationFrame(passoCarrossel); else animando = false;
+  }
+  function irPara(i, aplicar = true) {
+    alvo = Math.max(0, Math.min(CAPAS.length - 1, i));
+    if (!animando) { animando = true; requestAnimationFrame(passoCarrossel); }
+    const c = CAPAS[alvo];
+    pontos.forEach((p, k) => p.classList.toggle("on", k === alvo));
+    const n = FAM.filter(f => !c.id || f.nacao === c.id);
+    $("#sala-info").innerHTML = `
+      <div>Nação<b>${esc(c.nome)}</b></div>
+      <div>Força aérea<b>${esc(c.forca)}</b></div>
+      <div class="so-largo">Na capa<b>${c.aviao ? esc(c.aviao.fabricante + " " + c.aviao.nome) : "Bell P-39 Airacobra"}</b></div>
+      <div class="so-largo">Famílias<b>${n.length} · ${n.reduce((s, f) => s + f.variantes.length, 0)} variantes</b></div>
+      <a class="btn btn-pequeno" href="#grade">Ver os caças ↓</a>`;
+    if (aplicar && estado.nacao !== c.id) { estado.nacao = c.id; desenharGrade(); }
+  }
+  function desenharNacoes() { irPara(CAPAS.findIndex(c => c.id === estado.nacao), false); }
+
+  capas.forEach((el, i) => el.addEventListener("click", e => {
+    if (arraste && arraste.moveu) { e.preventDefault(); return; }
+    if (i === alvo) $("#grade").scrollIntoView({ behavior: reduz ? "auto" : "smooth" });
+    else irPara(i);
+  }));
+  pontos.forEach((p, i) => p.addEventListener("click", () => irPara(i)));
+  $("#sala-esq").addEventListener("click", () => irPara(alvo - 1));
+  $("#sala-dir").addEventListener("click", () => irPara(alvo + 1));
+  $("#sala").addEventListener("keydown", e => {
+    if (e.key === "ArrowLeft") { irPara(alvo - 1); e.preventDefault(); }
+    if (e.key === "ArrowRight") { irPara(alvo + 1); e.preventDefault(); }
+  });
+  palco.addEventListener("pointerdown", e => {
+    arraste = { x: e.clientX, p: pos, moveu: false, id: e.pointerId };
+  });
+  window.addEventListener("pointermove", e => {
+    if (!arraste || e.pointerId !== arraste.id) return;
+    const dx = e.clientX - arraste.x;
+    if (!arraste.moveu && Math.abs(dx) > 6) { arraste.moveu = true; palco.classList.add("arrastando"); }
+    if (!arraste.moveu) return;
+    pos = Math.max(-0.4, Math.min(CAPAS.length - 0.6, arraste.p - dx / ((capas[0].offsetWidth || 400) * 0.8)));
+    alvo = pos;
+    posicionar();
+  });
+  window.addEventListener("pointerup", e => {
+    if (!arraste || e.pointerId !== arraste.id) return;
+    palco.classList.remove("arrastando");
+    if (arraste.moveu) irPara(Math.round(pos));
+    setTimeout(() => { arraste = null; }, 0);
+  });
+  let rodaTempo = 0;
+  palco.addEventListener("wheel", e => {
+    if (Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return;
+    e.preventDefault();
+    const agora = performance.now();
+    if (agora - rodaTempo < 350) return;
+    rodaTempo = agora;
+    irPara(alvo + Math.sign(e.deltaX));
+  }, { passive: false });
+  window.addEventListener("resize", posicionar);
 
   function filtradas() {
     const q = estado.busca.trim().toLowerCase();
