@@ -714,7 +714,9 @@ details.creditos a:hover { color: var(--ambar); }
 .secao.cortina {
   border-top: 0;
   border-radius: 28px 28px 0 0;
-  margin-top: 46px;
+  /* pausa antes da próxima subir: rola um pouco sem nada mudar */
+  margin-top: max(46px, 32vh);
+  padding-bottom: clamp(130px, 16vw, 230px);
   box-shadow:
     0 -1px 0 rgba(255, 163, 26, calc(.18 + (1 - var(--k)) * .7)),
     0 -10px 40px rgba(255, 163, 26, calc((1 - var(--k)) * .12)),
@@ -734,6 +736,7 @@ details.creditos a:hover { color: var(--ambar); }
   font-family: var(--mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase;
   color: var(--ambar);
 }
+.marca-secao { display: block; height: 0; }
 /* escurece quando a próxima cobre */
 .cortina::after {
   content: "";
@@ -748,7 +751,7 @@ details.creditos a:hover { color: var(--ambar); }
 .cortina .secao-topo h2 { letter-spacing: calc(-.015em + (1 - var(--k)) * .06em); }
 .rodape { position: relative; z-index: 1; background: var(--fundo); }
 @media (max-width: 760px) {
-  .secao.cortina { border-radius: 20px 20px 0 0; margin-top: 40px; }
+  .secao.cortina { border-radius: 20px 20px 0 0; margin-top: max(40px, 24vh); padding-bottom: 120px; }
   .secao.cortina::before { height: 32px; top: -32px; font-size: 10px; }
 }
 
