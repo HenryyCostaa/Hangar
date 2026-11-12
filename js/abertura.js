@@ -1,10 +1,10 @@
 /* =========================================================
-   Portão + abertura: a foto do P-39 em relevo de grade (2,5D).
-   A foto vira uma malha quadriculada: cada célula tem o brilho
-   da foto e sai da tela conforme esse brilho (claro = perto).
-   Tudo no mesmo relógio da gravação do Allison V-1710 dando
-   partida; quando o motor pega, o relevo salta e a malha leva
-   uma onda de choque.
+   Portão + abertura: o P-39 se monta com partículas e vira
+   a foto em 2,5D.
+   Milhares de pontos voam de todos os lados e montam o P-39
+   (a foto noturna, disparando) enquanto o Allison V-1710 dá
+   partida na gravação. Quando o motor pega, os pontos viram a
+   foto nítida, com profundidade, que mexe com o mouse.
    ========================================================= */
 (() => {
   const $ = s => document.querySelector(s);
@@ -12,192 +12,187 @@
   const reduz = matchMedia("(prefers-reduced-motion: reduce)").matches;
   const portao = $("#portao"), ab = $("#abertura");
   const cv = $("#ab-grade"), g = cv.getContext("2d");
-  const status = $("#ab-status"), leituras = $("#ab-leituras");
+  const glc = $("#ab-foto3d");
   const bSom = $("#ligar-som"), bMudo = $("#ligar-mudo");
 
   /* ---------- linha do tempo (medida na gravação) ---------- */
   const P = T.tempos;
   const T_CLIPE = 2.75;                      // o trecho da gravação começa aqui
   const T_PARTIDA = T_CLIPE + P.arranque;    // o arranque começa a girar
-  const T_PEGA = T_CLIPE + P.pega;           // o motor pega
-  const T_FINAL = T_PEGA + 2.4, T_FIM = T_FINAL + 2.0;
-  const CHAVES = [
-    { grande: "Bateria", t: 0.4, txt: "Bateria · 24 V no barramento" },
-    { grande: "Combustível", t: 1.1, txt: "Bomba de combustível · 16 psi" },
-    { grande: "Magnetos", t: 1.8, txt: "Magnetos · ambos" },
-    { grande: "Primer", t: 2.4, txt: "Primer · 3 injeções" },
-    { grande: "Partida", t: T_PARTIDA, txt: "Arranque girando · a tensão cai" }
-  ];
-  const elPasso = $("#ab-passo");
-  function passo(pequeno, grande) {
-    elPasso.innerHTML = `<small>${pequeno}</small>${grande}`;
-    elPasso.classList.remove("troca"); void elPasso.offsetWidth; elPasso.classList.add("troca");
-  }
-
-  /* ---------- a foto vira relevo: claro = perto, escuro = longe ---------- */
+  const T_PEGA = T_CLIPE + P.pega;           // o motor pega: partículas viram foto
+  const T_FINAL = T_PEGA + 2.6, T_FIM = T_FINAL + 2.0;
   const sm = (a, b, v) => { const t = Math.min(1, Math.max(0, (v - a) / (b - a))); return t * t * (3 - 2 * t); };
-  const FOTO = "img/p39-noite-ab.jpg";
+  const ruido = (t, f) => Math.sin(t * f) * 0.6 + Math.sin(t * f * 2.7 + 1) * 0.4;
+
+  /* ---------- a foto ---------- */
   const foto = new Image();
   const fotoPronta = new Promise(r => { foto.onload = () => r(true); foto.onerror = () => r(false); });
-  foto.src = FOTO;
+  foto.src = "img/p39-noite-ab.jpg";
 
-  let W = 0, H = 0, dpr = 1, CEL = 12, nx = 0, ny = 0, X0 = 0, Y0 = 0;
-  let lum, prof, sorte, px, py;
-  function montar() {
-    dpr = Math.min(1.5, window.devicePixelRatio || 1);
-    W = cv.clientWidth; H = cv.clientHeight;
-    if (!W || !H || !foto.naturalWidth) { W = 0; return; }
-    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
-    CEL = W < 760 ? 7 : Math.max(8, Math.min(12, Math.round(W / 150)));
-    // a malha passa um pouco da tela pra aguentar a rotação
-    const EW = W * 1.3, EH = H * 1.3;
-    nx = Math.ceil(EW / CEL) + 1; ny = Math.ceil(EH / CEL) + 1;
-    X0 = -((nx - 1) * CEL) / 2; Y0 = -((ny - 1) * CEL) / 2;
-    // foto em "cover" na tela, deslocada um pouco pra direita como no retrato
-    const amostra = (blur) => {
-      const c = document.createElement("canvas"); c.width = nx; c.height = ny;
-      const k = c.getContext("2d", { willReadFrequently: true });
-      k.fillStyle = "#000"; k.fillRect(0, 0, nx, ny);
-      if (blur) k.filter = `blur(${blur}px)`;
-      const esc = (W < 760 ? W / foto.naturalWidth * 1.3 : Math.max(W / foto.naturalWidth, H / foto.naturalHeight) * 0.86) / CEL;
-      const fw = foto.naturalWidth * esc, fh = foto.naturalHeight * esc;
-      const desloc = W < 760 ? 0.1 : -0.02;
-      k.drawImage(foto, nx / 2 - fw / 2 - fw * desloc, ny / 2 - fh * 0.56, fw, fh);
-      const d = k.getImageData(0, 0, nx, ny).data, out = new Float32Array(nx * ny);
-      for (let i = 0; i < out.length; i++) out[i] = Math.min(1, Math.pow(Math.max(0, (d[i * 4] * 0.3 + d[i * 4 + 1] * 0.59 + d[i * 4 + 2] * 0.11) / 255 - 0.05) / 0.78, 0.85));
-      return out;
-    };
-    lum = amostra(0);
-    const borrada = amostra(1.6);
-    prof = new Float32Array(nx * ny); sorte = new Float32Array(nx * ny);
-    for (let i = 0; i < prof.length; i++) {
-      // o avião (cinza médio) sai bem da tela; os clarões dos tiros saem ainda mais
-      prof[i] = Math.min(1, Math.pow(borrada[i], 0.8));
-      sorte[i] = Math.random();
-    }
-    px = new Float32Array(nx * ny); py = new Float32Array(nx * ny);
+  let W = 0, H = 0, dpr = 1, Q = null;      // Q: onde a foto fica na tela (px)
+  // mesmo enquadramento pras partículas e pra foto 2,5D, pra uma virar a outra sem pulo
+  function enquadrar() {
+    const fa = foto.naturalWidth / foto.naturalHeight;
+    let fw, fh;
+    if (W < 760) { fw = W * 1.25; fh = fw / fa; }
+    else if (W / H > fa) { fw = W; fh = W / fa; }
+    else { fh = H; fw = H * fa; }
+    const x = (W - fw) / 2 + (W < 760 ? -W * 0.02 : 0), y = (H - fh) / 2 - (W < 760 ? H * 0.04 : 0);
+    return { x, y, w: fw, h: fh };
+  }
+  function lerFoto(cols, rows, passo, blur) {
+    const c = document.createElement("canvas"); c.width = cols; c.height = rows;
+    const k = c.getContext("2d", { willReadFrequently: true });
+    k.fillStyle = "#000"; k.fillRect(0, 0, cols, rows);
+    if (blur) k.filter = `blur(${blur}px)`;
+    k.drawImage(foto, Q.x / passo, Q.y / passo, Q.w / passo, Q.h / passo);
+    const d = k.getImageData(0, 0, cols, rows).data, o = new Float32Array(cols * rows);
+    for (let i = 0; i < o.length; i++) o[i] = (d[i * 4] * 0.3 + d[i * 4 + 1] * 0.59 + d[i * 4 + 2] * 0.11) / 255;
+    return o;
   }
 
-  /* ---------- câmera e desenho ---------- */
-  const ruido = (t, f) => Math.sin(t * f) * 0.6 + Math.sin(t * f * 2.7 + 1) * 0.4;
+  /* ---------- partículas ---------- */
+  let PT = null;
+  function montarParticulas() {
+    const passo = W < 760 ? 4 : 5;
+    const cols = Math.ceil(W / passo), rows = Math.ceil(H / passo);
+    const lum = lerFoto(cols, rows, passo, 0), prof = lerFoto(cols, rows, passo, 3);
+    const n = [];
+    for (let j = 0; j < rows; j++) for (let i = 0; i < cols; i++) {
+      const v = lum[j * cols + i];
+      if (v < 0.09) continue;
+      const a = Math.random() * Math.PI * 2, r = 700 + Math.random() * 1500;
+      n.push({
+        x: i * passo - W / 2, y: j * passo - H / 2, z: Math.pow(prof[j * cols + i], 0.8) * Math.min(W, H) * 0.3, v,
+        ox: Math.cos(a) * r, oy: (Math.random() - 0.5) * 1800, oz: Math.sin(a) * r,
+        atraso: 0.2 + Math.random() * 2.6 + (i / cols) * 1.6       // montam da cauda pro nariz
+      });
+    }
+    PT = { n, passo };
+  }
   const mouse = { x: 0, y: 0, sx: 0, sy: 0 };
   window.addEventListener("pointermove", e => { mouse.x = e.clientX / innerWidth * 2 - 1; mouse.y = e.clientY / innerHeight * 2 - 1; });
-  const NIV = 16;
-  const lotes = Array.from({ length: NIV }, () => []);
-  const ambar = [];
+  const lotes = Array.from({ length: 6 }, () => []), amb = [];
 
-  function quadroGrade(t) {
-    if (!W) { montar(); if (!W) return; }
-    const girando = t >= T_PARTIDA, pegou = t >= T_PEGA, final = t >= T_FINAL;
-
-    // profundidade: chapada até a partida, cresce com o arranque, salta quando pega
-    let amp = 0;
-    if (girando) amp = 0.35 * sm(T_PARTIDA, T_PEGA, t) + 0.025 * ruido(t, 19);
-    if (pegou) { const u = t - T_PEGA; amp = 1 + 0.3 * Math.exp(-u * 3) * Math.cos(u * 10) - 0.65 * Math.exp(-u * 8); }
-    const zMax = Math.min(W, H) * 0.24 * amp;
-
-    // câmera quase de frente; gira devagar em volta e segue o mouse
-    mouse.sx += (mouse.x - mouse.sx) * 0.06; mouse.sy += (mouse.y - mouse.sy) * 0.06;
-    const orbita = sm(T_PARTIDA - 1, T_PEGA, t);
-    const ga = (0.32 * Math.sin(t * 0.55 + 0.6) * orbita) + mouse.sx * 0.3 - 0.25 * sm(T_FINAL - 0.5, T_FIM, t);
-    const gb = (0.12 * Math.sin(t * 0.4) * orbita) - mouse.sy * 0.18;
+  function particulas(t, alfa) {
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    g.clearRect(0, 0, W, H);
+    if (alfa <= 0.002 || !PT) return;
+    // gira com o mouse e sozinho, mas volta de frente antes de virar foto
+    const livre = 1 - sm(T_PEGA - 1.6, T_PEGA - 0.2, t);
+    const ga = (mouse.sx * 0.55 + Math.sin(t * 0.5) * 0.3) * livre, gb = -mouse.sy * 0.3 * livre;
     const ca = Math.cos(ga), sa = Math.sin(ga), cb = Math.cos(gb), sb = Math.sin(gb);
-    const D = Math.max(W, H) * 1.4, cx = W / 2, cy = H / 2;
-
-    const uOnda = t - T_PEGA, onda = pegou && uOnda < 3;
-    for (let j = 0, k = 0; j < ny; j++) {
-      const Y = Y0 + j * CEL;
-      for (let i = 0; i < nx; i++, k++) {
-        const X = X0 + i * CEL;
-        let Z = prof[k] * zMax;
-        if (onda) {
-          const dist = Math.hypot(X, Y), frente = uOnda * 1100;
-          Z += 30 * Math.exp(-(((dist - frente) / 110) ** 2)) * Math.exp(-uOnda * 1.2) * Math.sin((dist - frente) / 26);
-        }
-        if (girando && !final && prof[k] > 0.05) Z += (pegou ? 1.4 : 0.7) * ruido(t + i * 0.37 + j * 0.11, 70);
-        const x1 = X * ca + Z * sa, z1 = -X * sa + Z * ca;
-        const y2 = Y * cb - z1 * sb, z2 = Y * sb + z1 * cb;
-        const s = D / Math.max(60, D - z2);
-        px[k] = cx + x1 * s; py[k] = cy + y2 * s;
-      }
-    }
-
-    const tremor = girando && !final ? (pegou ? 2.4 : 0.9) : 0;
-    g.setTransform(dpr, 0, 0, dpr, tremor * ruido(t, 61) * dpr, tremor * 0.6 * ruido(t, 53) * dpr);
-    g.fillStyle = "#050506";
-    g.fillRect(-10, -10, W + 20, H + 20);
-
-    // a grade inteira
-    const aparece = sm(0, 1.2, t);
-    g.lineWidth = 1;
-    g.strokeStyle = `rgba(232,230,225,${(0.17 * aparece).toFixed(3)})`;
-    g.beginPath();
-    for (let j = 0; j < ny; j++) { let k = j * nx; g.moveTo(px[k], py[k]); for (let i = 1; i < nx; i++) { k++; g.lineTo(px[k], py[k]); } }
-    for (let i = 0; i < nx; i++) { let k = i; g.moveTo(px[k], py[k]); for (let j = 1; j < ny; j++) { k += nx; g.lineTo(px[k], py[k]); } }
-    g.stroke();
-
-    // as células da foto acendem aos poucos (com as chaves) e piscam até o motor pegar
-    const acende = sm(0.3, T_PARTIDA, t);
-    const q = Math.floor(t * 12);
+    const D = Math.max(W, H) * 1.3, cx = W / 2, cy = H / 2;
+    const tam = PT.passo * 0.55;
+    const tremor = t >= T_PARTIDA && t < T_PEGA ? 1.2 : 0;
+    // quando pega, os pontos estouram um pouco pra fora enquanto a foto aparece
+    const estouro = t >= T_PEGA ? sm(T_PEGA, T_PEGA + 0.9, t) : 0;
     for (const l of lotes) l.length = 0;
-    ambar.length = 0;
-    for (let j = 0; j < ny - 1; j++) for (let i = 0; i < nx - 1; i++) {
-      const k = j * nx + i, v = lum[k];
-      if (v < 0.07 || sorte[k] > acende) continue;
-      if (!pegou && ((k * 2654435761 + q * 40503) >>> 0) % 23 === 0) continue;
-      if (v > 0.985) { ambar.push(k); continue; }
-      lotes[Math.min(NIV - 1, Math.floor(v / 0.985 * NIV))].push(k);
+    amb.length = 0;
+    for (const p of PT.n) {
+      const e = 1 - sm(p.atraso, p.atraso + 2.2, t);
+      const k = 1 + estouro * 0.08;
+      let x = (p.x + p.ox * e) * k, y = (p.y + p.oy * e) * k, z = p.z + p.oz * e + estouro * 120 * p.v;
+      if (tremor) { x += ruido(t + p.y * 0.01, 60) * tremor; y += ruido(t + p.x * 0.01, 50) * tremor; }
+      const x1 = x * ca + z * sa, z1 = -x * sa + z * ca;
+      const y2 = y * cb - z1 * sb, z2 = y * sb + z1 * cb;
+      const s = D / Math.max(40, D - z2);
+      const sx = cx + x1 * s, sy = cy + y2 * s;
+      if (sx < -5 || sx > W + 5 || sy < -5 || sy > H + 5) continue;
+      const it = [sx, sy, tam * s];
+      if (p.v > 0.9) amb.push(it); else lotes[Math.min(5, Math.floor(p.v * 6.6))].push(it);
     }
-    const quad = k => { g.moveTo(px[k], py[k]); g.lineTo(px[k + 1], py[k + 1]); g.lineTo(px[k + nx + 1], py[k + nx + 1]); g.lineTo(px[k + nx], py[k + nx]); g.closePath(); };
-    const brilho = pegou ? 1 : 0.55 + 0.3 * sm(T_PARTIDA, T_PEGA, t);
-    for (let n = 0; n < NIV; n++) {
-      if (!lotes[n].length) continue;
-      const b = (n + 0.5) / NIV;
-      g.fillStyle = `rgba(236,233,226,${Math.min(1, (0.05 + 0.95 * b) * brilho).toFixed(3)})`;
-      g.beginPath(); lotes[n].forEach(quad); g.fill();
-    }
-    // os clarões dos tiros e os traçantes em âmbar
-    if (ambar.length) {
-      g.fillStyle = `rgba(255,170,40,${(0.95 * brilho).toFixed(3)})`;
-      g.shadowColor = "rgba(255,163,26,.9)"; g.shadowBlur = pegou ? 14 : 6;
-      g.beginPath(); ambar.forEach(quad); g.fill();
-      g.shadowBlur = 0;
-    }
-    // vãos escuros entre as células, como no retrato quadriculado
-    g.strokeStyle = "rgba(5,5,6,.6)";
-    g.lineWidth = 1.1;
-    g.beginPath();
-    for (const l of lotes) l.forEach(quad);
-    g.stroke();
-
-    // clarão quando pega
-    if (pegou && uOnda < 0.5) { g.fillStyle = `rgba(255,236,200,${(0.3 * (1 - uOnda / 0.5)).toFixed(3)})`; g.fillRect(-10, -10, W + 20, H + 20); }
+    g.globalAlpha = alfa;
+    lotes.forEach((l, n) => { g.fillStyle = `rgba(236,233,226,${0.18 + n * 0.16})`; for (const [x, y, r] of l) g.fillRect(x, y, r, r); });
+    g.fillStyle = "#ffa31a"; for (const [x, y, r] of amb) g.fillRect(x, y, r * 1.3, r * 1.3);
+    g.globalAlpha = 1;
   }
 
-  /* ---------- leituras no rodapé ---------- */
-  const lido = { volts: 0, rpm: 0, oleo: 0, comb: 0, adm: 29.9 };
-  function atualizarLeituras(t, dt) {
-    const bat = t >= CHAVES[0].t, girando = t >= T_PARTIDA, pegou = t >= T_PEGA;
-    const rpm = T.rpmAbertura(t - T_CLIPE);
-    const alvo = {
-      volts: !bat ? 0 : pegou ? 28 : girando ? 18.5 + ruido(t, 9) * 0.7 : 24,
-      rpm,
-      oleo: pegou ? Math.min(70, (t - T_PEGA) * 60) : girando ? Math.min(12, (t - T_PARTIDA) * 2.5) : 0,
-      comb: t >= CHAVES[1].t ? 16 : 0,
-      adm: pegou ? 21 + ruido(t, 11) * 0.6 : girando ? 28.5 : 29.9
-    };
-    for (const k in lido) lido[k] += (alvo[k] - lido[k]) * Math.min(1, dt * (k === "rpm" ? 9 : 6));
-    const f = (v, c) => v.toFixed(c).replace(".", ",");
-    leituras.innerHTML =
-      `<span class="${girando && !pegou ? "quente" : ""}">Volts <b>${f(lido.volts, 1)}</b></span>` +
-      `<span class="${pegou ? "quente" : ""}">RPM <b>${String(Math.round(lido.rpm)).padStart(4, "0")}</b></span>` +
-      `<span>Óleo <b>${f(lido.oleo, 0)} psi</b></span>` +
-      `<span>Comb. <b>${f(lido.comb, 0)} psi</b></span>` +
-      `<span>Admissão <b>${f(lido.adm, 1)} pol Hg</b></span>` +
-      `<span>Ignição <b>${f(rpm / 10, 0)} faíscas/s</b></span>`;
+  /* ---------- a foto em 2,5D (WebGL) ---------- */
+  let GL = null;
+  function montarGL() {
+    if (GL) { GL.gl.viewport(0, 0, glc.width, glc.height); return; }
+    const gl = glc.getContext("webgl", { preserveDrawingBuffer: true });
+    if (!gl) return;
+    const vs = `attribute vec2 p; varying vec2 v; void main(){ v = p * .5 + .5; v.y = 1. - v.y; gl_Position = vec4(p, 0., 1.); }`;
+    const fs = `precision highp float; varying vec2 v;
+      uniform sampler2D foto, prof; uniform vec2 m, res; uniform vec4 quad; uniform float alfa, zoom, clarao;
+      void main(){
+        vec2 c = (v - .5) / zoom + .5;
+        vec2 uv = (c - quad.xy) / quad.zw;
+        // parallax: cada ponto anda conforme a profundidade (claro = perto)
+        vec2 desl = m * vec2(.045, .03);
+        vec2 q = uv; float d = 0.;
+        for (int i = 0; i < 12; i++) { d = texture2D(prof, q).r; q = uv - desl * (d - .25); }
+        vec3 col = vec3(0.);
+        if (q.x > 0. && q.x < 1. && q.y > 0. && q.y < 1.) col = texture2D(foto, q).rgb;
+        // esfuma as bordas da foto pra ela sumir no preto
+        vec2 bb = smoothstep(0., .07, q) * smoothstep(0., .07, 1. - q);
+        col *= bb.x * bb.y;
+        float l = dot(col, vec3(.3, .59, .11));
+        vec3 cor = mix(vec3(l), vec3(1., .72, .35) * l * 1.15, .8 * smoothstep(.9, 1., l));
+        // grade fina, empurrada pela profundidade
+        vec2 gg = abs(fract((c + desl * d * 1.4) * res / 26.) - .5);
+        float linha = 1. - smoothstep(0., .05, min(gg.x, gg.y));
+        cor += linha * (.04 + .22 * d);
+        cor *= 1. - .55 * dot(v - .5, v - .5) * 2.;
+        cor += clarao * vec3(1., .93, .8);
+        gl_FragColor = vec4(cor * alfa, alfa);   // transparente até virar foto (alfa pré-multiplicado)
+      }`;
+    const sh = (tp, s) => { const o = gl.createShader(tp); gl.shaderSource(o, s); gl.compileShader(o); return o; };
+    const pr = gl.createProgram();
+    gl.attachShader(pr, sh(gl.VERTEX_SHADER, vs)); gl.attachShader(pr, sh(gl.FRAGMENT_SHADER, fs));
+    gl.linkProgram(pr);
+    if (!gl.getProgramParameter(pr, gl.LINK_STATUS)) return;
+    gl.useProgram(pr);
+    const buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+    const loc = gl.getAttribLocation(pr, "p"); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+    const tex = (unit, src) => { const tx = gl.createTexture(); gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(gl.TEXTURE_2D, tx); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, src); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE); };
+    // mapa de profundidade: a foto borrada e com contraste
+    const dc = document.createElement("canvas"); dc.width = 640; dc.height = Math.round(640 * foto.naturalHeight / foto.naturalWidth);
+    const dk = dc.getContext("2d"); dk.filter = "blur(7px) contrast(1.8) brightness(1.3)"; dk.drawImage(foto, 0, 0, dc.width, dc.height);
+    tex(0, foto); tex(1, dc);
+    gl.uniform1i(gl.getUniformLocation(pr, "foto"), 0); gl.uniform1i(gl.getUniformLocation(pr, "prof"), 1);
+    const u = n => gl.getUniformLocation(pr, n);
+    GL = { gl, u: { m: u("m"), res: u("res"), quad: u("quad"), alfa: u("alfa"), zoom: u("zoom"), clarao: u("clarao") } };
+    gl.viewport(0, 0, glc.width, glc.height);
+  }
+  function foto3d(t, alfa) {
+    if (!GL) return;
+    const { gl, u } = GL;
+    const u0 = Math.max(0, t - T_PEGA);
+    const auto = sm(0.4, 2, u0), entra = sm(0, 1.2, u0);
+    gl.uniform2f(u.m, (mouse.sx + Math.sin(u0 * 0.6) * 0.4 * auto) * entra, (mouse.sy * 0.8 + Math.sin(u0 * 0.45) * 0.2 * auto) * entra);
+    gl.uniform2f(u.res, W, H);
+    gl.uniform4f(u.quad, Q.x / W, Q.y / H, Q.w / W, Q.h / H);
+    gl.uniform1f(u.alfa, alfa);
+    gl.uniform1f(u.zoom, 1 + 0.06 * sm(0, 4.5, u0));
+    gl.uniform1f(u.clarao, t >= T_PEGA ? 0.28 * Math.max(0, 1 - u0 / 0.45) : 0);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
   }
 
-  /* ---------- pré-carrega o áudio antes de liberar as chaves do portão ---------- */
+  function montar() {
+    dpr = Math.min(2, window.devicePixelRatio || 1);
+    W = innerWidth; H = innerHeight;
+    if (!foto.naturalWidth) return;
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    glc.width = Math.round(W * dpr); glc.height = Math.round(H * dpr);
+    Q = enquadrar();
+    montarParticulas();
+    montarGL();
+  }
+
+  function desenhar(t) {
+    const vira = sm(T_PEGA - 0.05, T_PEGA + 0.7, t);       // 0: partículas · 1: foto
+    particulas(t, 1 - vira);
+    foto3d(t, vira);
+    // a tela treme no arranque e quando pega
+    const tremor = t >= T_PARTIDA && t < T_PEGA + 0.8 ? (t >= T_PEGA ? 3 * (1 - (t - T_PEGA) / 0.8) : 0.8) : 0;
+    ab.style.transform = tremor ? `translate(${(ruido(t, 61) * tremor).toFixed(2)}px, ${(ruido(t, 53) * tremor * 0.6).toFixed(2)}px)` : "";
+  }
+
+  /* ---------- pré-carrega a foto e o áudio antes de liberar as chaves do portão ---------- */
   let liberado = false;
   function liberar() {
     if (liberado) return;
@@ -211,7 +206,7 @@
   setTimeout(liberar, 6000);
 
   /* ---------- quadro a quadro ---------- */
-  let relogio = null, rodando = false, comSom = false, ultimo = 0, ultimaChave = -1;
+  let relogio = null, rodando = false, comSom = false;
 
   function iniciar(som) {
     comSom = som;
@@ -231,29 +226,16 @@
       const p0 = performance.now() + 250;
       relogio = () => (performance.now() - p0) / 1000;
     }
-    if (reduz) { terminar(); return; }
+    if (reduz || !foto.naturalWidth) { terminar(); return; }
     requestAnimationFrame(quadro);
   }
 
   function quadro() {
     if (!rodando) return;
-    const t = Math.max(0, relogio()), dt = Math.min(0.05, Math.max(0, t - ultimo));
-    ultimo = t;
-    CHAVES.forEach((c, i) => {
-      if (t >= c.t && i > ultimaChave) {
-        ultimaChave = i;
-        status.textContent = c.txt;
-        passo(`0${i + 1} / 05 · P-39Q-1`, c.grande);
-      }
-    });
-    if (t >= T_PEGA && ultimaChave < 5) {
-      ultimaChave = 5;
-      status.textContent = "Pegou · 12 cilindros, mais de 100 faíscas por segundo";
-      passo("Allison V-1710-85", "Pegou");
-    }
+    const t = Math.max(0, relogio());
+    mouse.sx += (mouse.x - mouse.sx) * 0.06; mouse.sy += (mouse.y - mouse.sy) * 0.06;
     if (t >= T_FINAL) ab.classList.add("final");
-    quadroGrade(t, dt);
-    atualizarLeituras(t, dt);
+    desenhar(t);
     if (t >= T_FIM) { terminar(); return; }
     requestAnimationFrame(quadro);
   }
@@ -263,6 +245,7 @@
     rodando = false;
     if (pulou && comSom) T.pararPartida();
     ab.classList.add("saindo");
+    ab.style.transform = "";
     window.Hangar.revelar();
     if (comSom) T.ligar();
     setTimeout(() => { ab.hidden = true; }, 850);
@@ -287,8 +270,8 @@
       montar();
       const t = parseFloat(teste) || 0;
       if (t >= T_FINAL) ab.classList.add("final");
-      quadroGrade(t);
-      atualizarLeituras(t, 1);
+      desenhar(t);
+      ab.style.transform = "";
     });
   }
 })();
