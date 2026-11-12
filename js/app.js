@@ -154,101 +154,186 @@
   const papeis = [...new Set(FAM.map(f => f.papel))].sort();
   $("#f-papel").innerHTML += papeis.map(p => `<option>${esc(p)}</option>`).join("");
 
-  /* nações: capas em perspectiva, cada uma com o caça principal da nação */
+  /* nações: capas num cilindro (visto por dentro), com inércia, separação de cor
+     quando gira rápido, brilho seguindo o mouse e o fundo tingido pela foto ativa.
+     Os caças só aparecem depois de entrar numa nação. */
   const PRINCIPAL = { eua: "p51", ru: "spitfire", ale: "bf109", urss: "yak", jap: "a6m", ita: "macchi", fra: "d520", fin: "myrsky" };
+  const COR = { "": "255,163,26", eua: "90,140,255", ru: "235,80,90", ale: "220,220,220", urss: "255,70,60", jap: "255,90,90", ita: "60,200,120", fra: "90,150,255", fin: "120,170,255" };
   const CAPAS = [
     { id: "", nome: "Todas", forca: "8 nações", aviao: null, foto: "p39-noite" },
     ...NAC.map(n => { const f = familia(PRINCIPAL[n.id]); return { id: n.id, nome: n.nome, forca: n.forca, aviao: f, foto: f && f.fotos[0] }; })
   ];
-  const palco = $("#palco");
-  palco.innerHTML = CAPAS.map((c, i) => `<button class="capa" data-i="${i}" aria-label="${esc(c.nome)}${c.aviao ? " · " + esc(c.aviao.nome) : ""}">
-      <span class="capa-img" style="background-image:url('${abs(fotoUrl(c.foto, true))}')"></span>
-      <span class="capa-num">${String(i).padStart(2, "0")} / ${String(CAPAS.length - 1).padStart(2, "0")}</span>
+  const N = CAPAS.length;
+  const sala = $("#sala"), palco = $("#palco");
+  palco.innerHTML = CAPAS.map((c, i) => {
+    const img = abs(fotoUrl(c.foto, true));
+    return `<button class="capa" data-i="${i}" aria-label="${esc(c.nome)}${c.aviao ? " · " + esc(c.aviao.nome) : ""}">
+      <span class="capa-img" style="background-image:url('${img}')"></span>
+      <span class="capa-rgb r" style="background-image:url('${img}')"></span>
+      <span class="capa-rgb b" style="background-image:url('${img}')"></span>
+      <span class="capa-brilho"></span><span class="capa-varre"></span>
+      <span class="capa-num">${String(i).padStart(2, "0")} / ${String(N - 1).padStart(2, "0")}</span>
       ${c.id ? insignia(c.id, "ins") : ""}
       <span class="capa-nome">${esc(c.nome)}</span>
       <span class="capa-aviao">${c.aviao ? esc(c.aviao.nome) + " · " + c.aviao.primeiroVoo.slice(0, 4) : FAM.length + " famílias · " + totalVariantes + " variantes"}</span>
-    </button>`).join("");
+      <span class="capa-entrar">Entrar →</span>
+    </button>`;
+  }).join("");
   const capas = $$(".capa", palco);
   $("#sala-pontos").innerHTML = CAPAS.map((c, i) => `<button data-i="${i}" aria-label="${esc(c.nome)}"></button>`).join("");
   const pontos = $$("#sala-pontos button");
-  let pos = 0, alvo = 0, arraste = null, animando = false;
+  const glows = $$("#sala-glow span");
+  let pos = 0, vel = 0, alvo = 0, arraste = null, rodando = false, atualI = -1, glowK = 0;
+  const volta = i => ((i % N) + N) % N;
 
   function posicionar() {
     const larg = capas[0].offsetWidth || 400;
+    const R = larg * 2.1;                               // raio do cilindro
+    const passoAng = (larg * 0.82) / R * 57.2958;       // graus entre capas
     capas.forEach((el, i) => {
-      const d = i - pos, a = Math.abs(d), s = Math.sign(d);
-      const x = s * (Math.min(a, 1) * larg * 0.78 + Math.max(0, a - 1) * larg * 0.42);
-      const z = -Math.min(a, 3) * 210;
-      const r = -s * Math.min(a, 1) * 32;
-      el.style.transform = `translateX(${x.toFixed(1)}px) translateZ(${z.toFixed(1)}px) rotateY(${r.toFixed(2)}deg)`;
-      el.style.opacity = a > 2.6 ? Math.max(0, 3.4 - a) : 1;
+      let d = i - pos;
+      d = d - N * Math.round(d / N);                   // carrossel infinito
+      const a = Math.abs(d);
+      const ang = d * passoAng;
+      const tilt = Math.max(-8, Math.min(8, -vel * 6));
+      el.style.transform = `translateZ(${(-R * 0.08).toFixed(1)}px) translateZ(${R.toFixed(1)}px) rotateY(${(-ang).toFixed(2)}deg) translateZ(${(-R).toFixed(1)}px) rotateY(${(ang * 0.35).toFixed(2)}deg) skewX(${tilt.toFixed(2)}deg)`;
+      el.style.opacity = a > 3.2 ? Math.max(0, 4 - a) : 1;
       el.style.zIndex = 100 - Math.round(a * 10);
-      el.classList.toggle("centro", a < 0.5);
+      el.style.setProperty("--par", `${(d * 9).toFixed(2)}%`);
+      el.style.setProperty("--vel", (vel * 26).toFixed(2));
+      el.style.pointerEvents = a > 2.6 ? "none" : "";
       el.tabIndex = a < 0.5 ? 0 : -1;
     });
+    palco.classList.toggle("rapido", Math.abs(vel) > 0.04);
+    sala.style.setProperty("--chao", `${(-pos * 60).toFixed(1)}px`);
+    const i = volta(Math.round(pos));
+    if (i !== atualI) mudou(i);
   }
-  function passoCarrossel() {
-    pos += (alvo - pos) * (reduz ? 1 : 0.14);
-    if (Math.abs(alvo - pos) < 0.001) pos = alvo;
-    posicionar();
-    if (pos !== alvo) requestAnimationFrame(passoCarrossel); else animando = false;
-  }
-  function irPara(i, aplicar = true) {
-    alvo = Math.max(0, Math.min(CAPAS.length - 1, i));
-    if (!animando) { animando = true; requestAnimationFrame(passoCarrossel); }
-    const c = CAPAS[alvo];
-    pontos.forEach((p, k) => p.classList.toggle("on", k === alvo));
+
+  function mudou(i) {
+    atualI = i;
+    const c = CAPAS[i];
+    capas.forEach((el, k) => el.classList.toggle("centro", k === i));
+    pontos.forEach((p, k) => p.classList.toggle("on", k === i));
+    sala.style.setProperty("--cor", COR[c.id] || COR[""]);
+    // fundo tingido: troca de camada
+    glowK = 1 - glowK;
+    glows[glowK].style.backgroundImage = `url("${abs(fotoUrl(c.foto, true))}")`;
+    glows.forEach((g, k) => g.classList.toggle("on", k === glowK));
+    $("#sala-nome").innerHTML = [...c.nome].map((l, k) => `<span style="animation-delay:${k * 0.035}s">${l === " " ? "&nbsp;" : esc(l)}</span>`).join("");
     const n = FAM.filter(f => !c.id || f.nacao === c.id);
     $("#sala-info").innerHTML = `
       <div>Nação<b>${esc(c.nome)}</b></div>
       <div>Força aérea<b>${esc(c.forca)}</b></div>
       <div class="so-largo">Na capa<b>${c.aviao ? esc(c.aviao.fabricante + " " + c.aviao.nome) : "Bell P-39 Airacobra"}</b></div>
-      <div class="so-largo">Famílias<b>${n.length} · ${n.reduce((s, f) => s + f.variantes.length, 0)} variantes</b></div>
-      <a class="btn btn-pequeno" href="#grade">Ver os caças ↓</a>`;
-    if (aplicar && estado.nacao !== c.id) { estado.nacao = c.id; desenharGrade(); }
+      <div class="so-largo">Famílias<b>${n.length} · ${n.reduce((s, f) => s + f.variantes.length, 0)} variantes</b></div>`;
   }
-  function desenharNacoes() { irPara(CAPAS.findIndex(c => c.id === estado.nacao), false); }
 
-  capas.forEach((el, i) => el.addEventListener("click", e => {
-    if (arraste && arraste.moveu) { e.preventDefault(); return; }
-    if (i === alvo) $("#grade").scrollIntoView({ behavior: reduz ? "auto" : "smooth" });
-    else irPara(i);
-  }));
-  pontos.forEach((p, i) => p.addEventListener("click", () => irPara(i)));
-  $("#sala-esq").addEventListener("click", () => irPara(alvo - 1));
-  $("#sala-dir").addEventListener("click", () => irPara(alvo + 1));
-  $("#sala").addEventListener("keydown", e => {
-    if (e.key === "ArrowLeft") { irPara(alvo - 1); e.preventDefault(); }
-    if (e.key === "ArrowRight") { irPara(alvo + 1); e.preventDefault(); }
+  // física: mola até o alvo quando solto, inércia quando arrasta
+  function passoFisica() {
+    if (!arraste) {
+      const f = (alvo - pos) * 0.032;     // mola mole: chega devagar e assenta suave
+      vel = (vel + f) * 0.86;
+      pos += vel;
+      if (Math.abs(alvo - pos) < 0.0008 && Math.abs(vel) < 0.0008) { pos = alvo; vel = 0; }
+    }
+    posicionar();
+    if (arraste || pos !== alvo || vel) requestAnimationFrame(passoFisica); else rodando = false;
+  }
+  function animar() { if (!rodando) { rodando = true; requestAnimationFrame(passoFisica); } }
+  function irPara(i) {
+    // menor caminho no círculo
+    let d = i - pos; d = d - N * Math.round(d / N);
+    alvo = Math.round(pos + d);
+    if (reduz) { pos = alvo; vel = 0; posicionar(); return; }
+    animar();
+  }
+  function desenharNacoes() { posicionar(); }
+
+  capas.forEach((el, i) => {
+    el.addEventListener("click", e => {
+      if (arraste && arraste.moveu) { e.preventDefault(); return; }
+      if (i === atualI) entrarNacao(CAPAS[i].id, e);
+      else irPara(Math.round(pos) + ((i - atualI + N + N / 2) % N) - N / 2);
+    });
+    el.addEventListener("pointermove", e => {
+      const r = el.getBoundingClientRect();
+      el.style.setProperty("--mx", `${((e.clientX - r.left) / r.width * 100).toFixed(1)}%`);
+      el.style.setProperty("--my", `${((e.clientY - r.top) / r.height * 100).toFixed(1)}%`);
+    });
   });
+  pontos.forEach((p, i) => p.addEventListener("click", () => irPara(Math.round(pos) + ((i - atualI + N + N / 2) % N) - N / 2)));
+  $("#sala-esq").addEventListener("click", () => irPara(Math.round(alvo) - 1));
+  $("#sala-dir").addEventListener("click", () => irPara(Math.round(alvo) + 1));
+  sala.addEventListener("keydown", e => {
+    if (e.key === "ArrowLeft") { irPara(Math.round(alvo) - 1); e.preventDefault(); }
+    if (e.key === "ArrowRight") { irPara(Math.round(alvo) + 1); e.preventDefault(); }
+    if (e.key === "Enter" && e.target === sala) entrarNacao(CAPAS[atualI].id);
+  });
+  sala.addEventListener("pointermove", e => { const r = sala.getBoundingClientRect(); sala.style.setProperty("--lx", `${((e.clientX - r.left) / r.width * 100).toFixed(1)}%`); });
   palco.addEventListener("pointerdown", e => {
-    arraste = { x: e.clientX, p: pos, moveu: false, id: e.pointerId };
+    arraste = { x: e.clientX, p: pos, moveu: false, id: e.pointerId, ux: e.clientX, ut: performance.now() };
   });
   window.addEventListener("pointermove", e => {
     if (!arraste || e.pointerId !== arraste.id) return;
     const dx = e.clientX - arraste.x;
-    if (!arraste.moveu && Math.abs(dx) > 6) { arraste.moveu = true; palco.classList.add("arrastando"); }
+    if (!arraste.moveu && Math.abs(dx) > 6) { arraste.moveu = true; palco.classList.add("arrastando"); animar(); }
     if (!arraste.moveu) return;
-    pos = Math.max(-0.4, Math.min(CAPAS.length - 0.6, arraste.p - dx / ((capas[0].offsetWidth || 400) * 0.8)));
-    alvo = pos;
-    posicionar();
+    const novo = arraste.p - dx / ((capas[0].offsetWidth || 400) * 0.85);
+    const agora = performance.now();
+    vel = vel * 0.75 + (novo - pos) * 0.25;
+    pos = novo;
+    arraste.ut = agora;
   });
   window.addEventListener("pointerup", e => {
     if (!arraste || e.pointerId !== arraste.id) return;
     palco.classList.remove("arrastando");
-    if (arraste.moveu) irPara(Math.round(pos));
-    setTimeout(() => { arraste = null; }, 0);
+    if (arraste.moveu) { alvo = Math.round(pos + vel * 14); }   // joga com a inércia
+    const a = arraste;
+    arraste = null;
+    if (a.moveu) { arraste = { moveu: true, solto: true }; setTimeout(() => { arraste = null; animar(); }, 0); }
   });
   let rodaTempo = 0;
   palco.addEventListener("wheel", e => {
-    if (Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return;
+    if (Math.abs(e.deltaX) <= Math.abs(e.deltaY) && !e.shiftKey) return;
     e.preventDefault();
     const agora = performance.now();
-    if (agora - rodaTempo < 350) return;
+    if (agora - rodaTempo < 260) return;
     rodaTempo = agora;
-    irPara(alvo + Math.sign(e.deltaX));
+    irPara(Math.round(alvo) + Math.sign(e.deltaX || e.deltaY));
   }, { passive: false });
   window.addEventListener("resize", posicionar);
+
+  /* ---------- dentro da nação: capa grande + filtros + cards ---------- */
+  const nacTela = $("#nacao-tela");
+  function entrarNacao(id, ev) {
+    const c = CAPAS.find(k => k.id === id) || CAPAS[0];
+    estado.nacao = id;
+    nacTela.style.setProperty("--cx", ev && ev.clientX ? ev.clientX + "px" : "50%");
+    nacTela.style.setProperty("--cy", ev && ev.clientY ? ev.clientY + "px" : "50%");
+    $("#nac-capa").style.backgroundImage = `url("${abs(fotoUrl(c.foto))}")`;
+    const n = FAM.filter(f => !id || f.nacao === id);
+    $("#nac-ref").textContent = `Hangar · ${c.nome}`;
+    $("#nac-txt").innerHTML = `<p>${id ? insignia(id) : ""} ${esc(c.forca)}</p>
+      <h2 id="nac-nome">${[...c.nome].map((l, k) => `<span style="animation-delay:${0.35 + k * 0.04}s">${l === " " ? "&nbsp;" : esc(l)}</span>`).join("")}</h2>
+      <small>${n.length} ${n.length === 1 ? "família" : "famílias"} · ${n.reduce((s, f) => s + f.variantes.length, 0)} variantes${c.aviao ? " · na capa: " + esc(c.aviao.fabricante + " " + c.aviao.nome) : ""}</small>`;
+    desenharGrade();
+    nacTela.hidden = false;
+    nacTela.scrollTop = 0;
+    document.body.classList.add("com-nacao");
+    void nacTela.offsetWidth;
+    nacTela.classList.add("on");
+    setTimeout(() => $("#nac-voltar").focus({ preventScroll: true }), 60);
+  }
+  function sairNacao() {
+    if (nacTela.hidden) return;
+    nacTela.classList.remove("on");
+    document.body.classList.remove("com-nacao");
+    setTimeout(() => { if (!nacTela.classList.contains("on")) nacTela.hidden = true; }, reduz ? 0 : 850);
+    capas[atualI] && capas[atualI].focus({ preventScroll: true });
+  }
+  $("#nac-voltar").addEventListener("click", sairNacao);
+  document.addEventListener("keydown", e => { if (e.key === "Escape" && !nacTela.hidden && $("#ficha").hidden) sairNacao(); });
 
   function filtradas() {
     const q = estado.busca.trim().toLowerCase();
@@ -294,7 +379,7 @@
         </div>
       </button>`;
     }).join("") : `<p class="mudo">Nenhuma família com esses filtros.</p>`;
-    $$("#grade .card").forEach(c => c.addEventListener("click", () => abrirFicha(c.dataset.id)));
+    $$("#grade .card").forEach((c, k) => { c.style.animationDelay = `${0.45 + Math.min(k, 12) * 0.05}s`; c.addEventListener("click", () => abrirFicha(c.dataset.id)); });
   }
 
   $("#f-motor").addEventListener("change", e => { estado.motor = e.target.value; desenharGrade(); });

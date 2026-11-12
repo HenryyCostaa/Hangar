@@ -86,37 +86,18 @@
     <header class="secao-topo">
       <p class="mono ambar">01 · Hangar</p>
       <h2>Escolha a nação</h2>
-      <p>Cada caça fica na nação que o projetou. Abra a família pra ver todas as variantes, o motor e a história.</p>
+      <p>Arraste ou use as setas pra girar. Clique na nação do centro pra entrar no hangar dela.</p>
     </header>
-    <div class="sala" id="sala" role="region" aria-roledescription="carrossel" aria-label="Nações">
+    <div class="sala" id="sala" role="region" aria-roledescription="carrossel" aria-label="Nações" tabindex="0">
+      <div class="sala-glow" id="sala-glow" aria-hidden="true"><span></span><span></span></div>
+      <p class="sala-nome" id="sala-nome" aria-hidden="true"></p>
       <div class="palco" id="palco"></div>
+      <div class="sala-ruido" aria-hidden="true"></div>
       <button class="sala-seta esq" id="sala-esq" aria-label="Nação anterior">‹</button>
       <button class="sala-seta dir" id="sala-dir" aria-label="Próxima nação">›</button>
       <div class="sala-pontos" id="sala-pontos"></div>
       <div class="sala-info" id="sala-info" aria-live="polite"></div>
     </div>
-    <div class="filtros">
-      <div class="campo"><label for="f-motor">Motor</label>
-        <select id="f-motor">
-          <option value="">Todos</option>
-          <option value="linha">Em linha / V</option>
-          <option value="radial">Radial</option>
-          <option value="jato">A jato</option>
-        </select>
-      </div>
-      <div class="campo"><label for="f-papel">Papel</label><select id="f-papel"><option value="">Todos</option></select></div>
-      <div class="campo"><label for="f-ordem">Ordem</label>
-        <select id="f-ordem">
-          <option value="voo">1º voo</option>
-          <option value="vel">Velocidade</option>
-          <option value="prod">Produção</option>
-          <option value="nome">Nome</option>
-        </select>
-      </div>
-      <div class="campo"><label for="f-busca">Buscar</label><input id="f-busca" type="search" placeholder="Corsair, Yak, DB 605…"></div>
-    </div>
-    <p class="mono contagem" id="contagem"></p>
-    <div class="grade" id="grade"></div>
   </section>
 
   <!-- COMPARADOR -->
@@ -208,6 +189,39 @@
   <span>Hangar · arquivo técnico de caças 1939–1945</span>
   <span>Fichas: Wikipedia · Fotos: Wikimedia Commons</span>
 </footer>
+
+<!-- ============ DENTRO DA NAÇÃO: os caças só aparecem aqui ============ -->
+<div class="nacao-tela" id="nacao-tela" hidden role="dialog" aria-modal="true" aria-labelledby="nac-nome">
+  <div class="nac-barra">
+    <button class="btn btn-pequeno" id="nac-voltar">← Nações</button>
+    <span class="mono mudo" id="nac-ref"></span>
+  </div>
+  <div class="nac-capa" id="nac-capa"><div class="nac-txt" id="nac-txt"></div></div>
+  <div class="nac-corpo">
+    <div class="filtros">
+      <div class="campo"><label for="f-motor">Motor</label>
+        <select id="f-motor">
+          <option value="">Todos</option>
+          <option value="linha">Em linha / V</option>
+          <option value="radial">Radial</option>
+          <option value="jato">A jato</option>
+        </select>
+      </div>
+      <div class="campo"><label for="f-papel">Papel</label><select id="f-papel"><option value="">Todos</option></select></div>
+      <div class="campo"><label for="f-ordem">Ordem</label>
+        <select id="f-ordem">
+          <option value="voo">1º voo</option>
+          <option value="vel">Velocidade</option>
+          <option value="prod">Produção</option>
+          <option value="nome">Nome</option>
+        </select>
+      </div>
+      <div class="campo"><label for="f-busca">Buscar</label><input id="f-busca" type="search" placeholder="Corsair, Yak, DB 605…"></div>
+    </div>
+    <p class="mono contagem" id="contagem"></p>
+    <div class="grade" id="grade"></div>
+  </div>
+</div>
 
 <!-- ============ FICHA DA FAMÍLIA ============ -->
 <div class="ficha" id="ficha" hidden role="dialog" aria-modal="true" aria-labelledby="ficha-nome">
